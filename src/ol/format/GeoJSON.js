@@ -103,7 +103,9 @@ class GeoJSON extends JSONFeature {
       geoJSONFeature = {
         'type': 'Feature',
         'geometry': /** @type {GeoJSONGeometry} */ (object),
-        'properties': null
+        'properties': null,
+        'links':null, /* Added for [STAC] support */
+        'assets':null /* Added for [STAC] support */
       };
     }
 
@@ -118,6 +120,16 @@ class GeoJSON extends JSONFeature {
 
     if ('id' in geoJSONFeature) {
       feature.setId(geoJSONFeature['id']);
+    }
+
+    /* Added for [STAC] support */
+    if (geoJSONFeature['links']) {
+      feature.set('_links', geoJSONFeature['links'], true);
+    }
+
+    /* Added for [STAC] support */
+    if (geoJSONFeature['assets']) {
+      feature.set('_assets', geoJSONFeature['assets'], true);
     }
 
     if (geoJSONFeature['properties']) {
@@ -191,7 +203,9 @@ class GeoJSON extends JSONFeature {
     const object = {
       'type': 'Feature',
       geometry: null,
-      properties: null
+      properties: null,
+      links:null, /* Added for [STAC] support */
+      assets:null /* Added for [STAC] support */
     };
 
     const id = feature.getId();
@@ -204,8 +218,23 @@ class GeoJSON extends JSONFeature {
       object.geometry = writeGeometry(geometry, opt_options);
     }
 
+    /* Added for [STAC] support */
+    const links = feature.get('_links');
+    if (links !== undefined) {
+      object.links = links;
+    }
+
+     /* Added for [STAC] support */
+    const assets = feature.get('_assets');
+    if (assets !== undefined) {
+      object.assets = assets;
+    }
+
     const properties = feature.getProperties();
     delete properties[feature.getGeometryName()];
+    delete properties['_links'];
+    delete properties['_assets'];
+    
     if (!isEmpty(properties)) {
       object.properties = properties;
     }
