@@ -105,7 +105,9 @@ class GeoJSON extends JSONFeature {
         'geometry': /** @type {GeoJSONGeometry} */ (object),
         'properties': null,
         'links':null, /* Added for [STAC] support */
-        'assets':null /* Added for [STAC] support */
+        'assets':null, /* Added for [STAC] support */
+        'collection':null, /* Added for [STAC] support */
+        'bbox':null /* Added for [STAC] support */
       };
     }
 
@@ -130,6 +132,16 @@ class GeoJSON extends JSONFeature {
     /* Added for [STAC] support */
     if (geoJSONFeature['assets']) {
       feature.set('_assets', geoJSONFeature['assets'], true);
+    }
+
+    /* Added for [STAC] support */
+    if (geoJSONFeature['collection']) {
+      feature.set('_collection', geoJSONFeature['collection'], true);
+    }
+
+    /* Added for [STAC] support */
+    if (geoJSONFeature['bbox']) {
+      feature.set('_bbox', geoJSONFeature['bbox'], true);
     }
 
     if (geoJSONFeature['properties']) {
@@ -224,16 +236,30 @@ class GeoJSON extends JSONFeature {
       object.links = links;
     }
 
-     /* Added for [STAC] support */
+    /* Added for [STAC] support */
     const assets = feature.get('_assets');
     if (assets !== undefined) {
       object.assets = assets;
+    }
+
+    /* Added for [STAC] support */
+    const collection = feature.get('_collection');
+    if (collection !== undefined) {
+      object.collection = collection;
+    }
+
+    /* Added for [STAC] support */
+    const bbox = feature.get('_bbox');
+    if (bbox !== undefined) {
+      object.bbox = bbox;
     }
 
     const properties = feature.getProperties();
     delete properties[feature.getGeometryName()];
     delete properties['_links'];
     delete properties['_assets'];
+    delete properties['_collection'];
+    delete properties['_bbox'];
     
     if (!isEmpty(properties)) {
       object.properties = properties;
