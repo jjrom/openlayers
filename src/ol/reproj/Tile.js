@@ -7,9 +7,9 @@ import Tile from '../Tile.js';
 import TileState from '../TileState.js';
 import {listen, unlistenByKey} from '../events.js';
 import EventType from '../events/EventType.js';
-import {getArea, getCenter, getIntersection} from '../extent.js';
+import {getArea, getIntersection} from '../extent.js';
 import {clamp} from '../math.js';
-import {calculateSourceResolution, render as renderReprojected} from '../reproj.js';
+import {calculateSourceExtentResolution, render as renderReprojected} from '../reproj.js';
 import Triangulation from './Triangulation.js';
 
 
@@ -38,7 +38,8 @@ class ReprojTile extends Tile {
    *     Function returning source tiles (z, x, y, pixelRatio).
    * @param {number=} opt_errorThreshold Acceptable reprojection error (in px).
    * @param {boolean=} opt_renderEdges Render reprojection edges.
-   */
+   * @param {object=} opt_contextOptions Properties to set on the canvas context.
+ */
   constructor(
     sourceProj,
     sourceTileGrid,
@@ -50,7 +51,8 @@ class ReprojTile extends Tile {
     gutter,
     getTileFunction,
     opt_errorThreshold,
-    opt_renderEdges
+    opt_renderEdges,
+    opt_contextOptions
   ) {
     super(tileCoord, TileState.IDLE);
 
@@ -59,6 +61,12 @@ class ReprojTile extends Tile {
      * @type {boolean}
      */
     this.renderEdges_ = opt_renderEdges !== undefined ? opt_renderEdges : false;
+
+    /**
+     * @private
+     * @type {object}
+     */
+    this.contextOptions_ = opt_contextOptions;
 
     /**
      * @private
@@ -140,9 +148,8 @@ class ReprojTile extends Tile {
     const targetResolution = targetTileGrid.getResolution(
       this.wrappedTileCoord_[0]);
 
-    const targetCenter = getCenter(limitedTargetExtent);
-    const sourceResolution = calculateSourceResolution(
-      sourceProj, targetProj, targetCenter, targetResolution);
+    const sourceResolution = calculateSourceExtentResolution(
+      sourceProj, targetProj, limitedTargetExtent, targetResolution);
 
     if (!isFinite(sourceResolution) || sourceResolution <= 0) {
       // invalid sourceResolution -> EMPTY
@@ -160,7 +167,7 @@ class ReprojTile extends Tile {
      */
     this.triangulation_ = new Triangulation(
       sourceProj, targetProj, limitedTargetExtent, maxSourceExtent,
-      sourceResolution * errorThresholdInPixels);
+      sourceResolution * errorThresholdInPixels, targetResolution);
 
     if (this.triangulation_.getTriangles().length === 0) {
       // no valid triangles -> EMPTY
@@ -241,7 +248,7 @@ class ReprojTile extends Tile {
       this.canvas_ = renderReprojected(width, height, this.pixelRatio_,
         sourceResolution, this.sourceTileGrid_.getExtent(),
         targetResolution, targetExtent, this.triangulation_, sources,
-        this.gutter_, this.renderEdges_);
+        this.gutter_, this.renderEdges_, this.contextOptions_);
 
       this.state = TileState.LOADED;
     }

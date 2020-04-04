@@ -1,7 +1,7 @@
 /**
  * @module ol/reproj/Triangulation
  */
-import {boundingExtent, createEmpty, extendCoordinate, getBottomLeft, getBottomRight,
+import {boundingExtent, createEmpty, extendCoordinate, getArea, getBottomLeft, getBottomRight,
   getTopLeft, getTopRight, getWidth, intersects} from '../extent.js';
 import {modulo} from '../math.js';
 import {getTransform} from '../proj.js';
@@ -49,8 +49,9 @@ class Triangulation {
    * @param {import("../extent.js").Extent} targetExtent Target extent to triangulate.
    * @param {import("../extent.js").Extent} maxSourceExtent Maximal source extent that can be used.
    * @param {number} errorThreshold Acceptable error (in source units).
+   * @param {?number} opt_destinationResolution The (optional) resolution of the destination.
    */
-  constructor(sourceProj, targetProj, targetExtent, maxSourceExtent, errorThreshold) {
+  constructor(sourceProj, targetProj, targetExtent, maxSourceExtent, errorThreshold, opt_destinationResolution) {
 
     /**
      * @type {import("../proj/Projection.js").default}
@@ -138,11 +139,26 @@ class Triangulation {
     const sourceBottomRight = this.transformInv_(destinationBottomRight);
     const sourceBottomLeft = this.transformInv_(destinationBottomLeft);
 
+    /*
+     * The maxSubdivision controls how many splittings of the target area can
+     * be done. The idea here is to do a linear mapping of the target areas
+     * but the actual overal reprojection (can be) extremely non-linear. The
+     * default value of MAX_SUBDIVISION was chosen based on mapping a 256x256
+     * tile size. However this function is also called to remap canvas rendered
+     * layers which can be much larger. This calculation increases the maxSubdivision
+     * value by the right factor so that each 256x256 pixel area has
+     * MAX_SUBDIVISION divisions.
+     */
+    const maxSubdivision = MAX_SUBDIVISION + (opt_destinationResolution ?
+      Math.max(0, Math.ceil(Math.log2(getArea(targetExtent) /
+        (opt_destinationResolution * opt_destinationResolution * 256 * 256))))
+      : 0);
+
     this.addQuad_(
       destinationTopLeft, destinationTopRight,
       destinationBottomRight, destinationBottomLeft,
       sourceTopLeft, sourceTopRight, sourceBottomRight, sourceBottomLeft,
-      MAX_SUBDIVISION);
+      maxSubdivision);
 
     if (this.wrapsXInSource_) {
       let leftBound = Infinity;
@@ -247,11 +263,18 @@ class Triangulation {
     }
 
     if (!needsSubdivision && this.maxSourceExtent_) {
-      if (!intersects(sourceQuadExtent, this.maxSourceExtent_)) {
-        // whole quad outside source projection extent -> ignore
-        return;
+      if (isFinite(sourceQuadExtent[0]) &&
+          isFinite(sourceQuadExtent[1]) &&
+          isFinite(sourceQuadExtent[2]) &&
+          isFinite(sourceQuadExtent[3])) {
+        if (!intersects(sourceQuadExtent, this.maxSourceExtent_)) {
+          // whole quad outside source projection extent -> ignore
+          return;
+        }
       }
     }
+
+    let isNotFinite = 0;
 
     if (!needsSubdivision) {
       if (!isFinite(aSrc[0]) || !isFinite(aSrc[1]) ||
@@ -261,7 +284,16 @@ class Triangulation {
         if (maxSubdivision > 0) {
           needsSubdivision = true;
         } else {
-          return;
+          // It might be the case that only 1 of the points is infinite. In this case
+          // we can draw a single triangle with the other three points
+          isNotFinite =
+              ((!isFinite(aSrc[0]) || !isFinite(aSrc[1])) ? 8 : 0) +
+              ((!isFinite(bSrc[0]) || !isFinite(bSrc[1])) ? 4 : 0) +
+              ((!isFinite(cSrc[0]) || !isFinite(cSrc[1])) ? 2 : 0) +
+              ((!isFinite(dSrc[0]) || !isFinite(dSrc[1])) ? 1 : 0);
+          if (isNotFinite != 1 && isNotFinite != 2 && isNotFinite != 4 && isNotFinite != 8) {
+            return;
+          }
         }
       }
     }
@@ -320,8 +352,25 @@ class Triangulation {
       this.wrapsXInSource_ = true;
     }
 
-    this.addTriangle_(a, c, d, aSrc, cSrc, dSrc);
-    this.addTriangle_(a, b, c, aSrc, bSrc, cSrc);
+    // Exactly zero or one of *Src is not finite
+    // The triangles must have the diagonal line as the first side
+    // This is to allow easy code in reproj.s to make it straight for broken
+    // browsers that can't handle diagonal clipping
+    if ((isNotFinite & 0xb) == 0) {
+      this.addTriangle_(a, c, d, aSrc, cSrc, dSrc);
+    }
+    if ((isNotFinite & 0xe) == 0) {
+      this.addTriangle_(a, c, b, aSrc, cSrc, bSrc);
+    }
+    if (isNotFinite) {
+      // Try the other two triangles
+      if ((isNotFinite & 0xd) == 0) {
+        this.addTriangle_(b, d, a, bSrc, dSrc, aSrc);
+      }
+      if ((isNotFinite & 0x7) == 0) {
+        this.addTriangle_(b, d, c, bSrc, dSrc, cSrc);
+      }
+    }
   }
 
   /**

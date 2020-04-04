@@ -9,6 +9,8 @@ import {createEmpty, equals, getIntersection, getTopLeft} from '../../extent.js'
 import CanvasLayerRenderer from './Layer.js';
 import {apply as applyTransform, compose as composeTransform, makeInverse} from '../../transform.js';
 import {numberSafeCompareFunction} from '../../array.js';
+import {createTransformString} from '../../render/canvas.js';
+import {assign} from '../../obj.js';
 
 /**
  * @classdesc
@@ -243,7 +245,7 @@ class CanvasTileLayerRenderer extends CanvasLayerRenderer {
       -width / 2, -height / 2
     );
 
-    const canvasTransform = this.createTransformString(this.pixelTransform);
+    const canvasTransform = createTransformString(this.pixelTransform);
 
     this.useContainer(target, canvasTransform, layerState.opacity);
     const context = this.context;
@@ -270,6 +272,7 @@ class CanvasTileLayerRenderer extends CanvasLayerRenderer {
       this.clipUnrotated(context, frameState, layerExtent);
     }
 
+    assign(context, tileSource.getContextOptions());
     this.preRender(context, frameState);
 
     this.renderedTiles.length = 0;
