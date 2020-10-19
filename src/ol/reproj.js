@@ -1,11 +1,21 @@
 /**
  * @module ol/reproj
  */
-import {createCanvasContext2D} from './dom.js';
-import {containsCoordinate, createEmpty, extend, forEachCorner, getCenter, getHeight, getTopLeft, getWidth} from './extent.js';
-import {solveLinearSystem} from './math.js';
-import {getPointResolution, transform} from './proj.js';
+import {IMAGE_SMOOTHING_DISABLED} from './source/common.js';
 import {assign} from './obj.js';
+import {
+  containsCoordinate,
+  createEmpty,
+  extend,
+  forEachCorner,
+  getCenter,
+  getHeight,
+  getTopLeft,
+  getWidth,
+} from './extent.js';
+import {createCanvasContext2D} from './dom.js';
+import {getPointResolution, transform} from './proj.js';
+import {solveLinearSystem} from './math.js';
 
 let brokenDiagonalRendering_;
 
@@ -41,7 +51,10 @@ function drawTestTriangle(ctx, u1, v1, u2, v2) {
  */
 function verifyBrokenDiagonalRendering(data, offset) {
   // the values ought to be close to the rgba(210, 0, 0, 0.75)
-  return Math.abs(data[offset * 4] - 210) > 2 || Math.abs(data[offset * 4 + 3] - 0.75 * 255) > 2;
+  return (
+    Math.abs(data[offset * 4] - 210) > 2 ||
+    Math.abs(data[offset * 4 + 3] - 0.75 * 255) > 2
+  );
 }
 
 /**
@@ -62,9 +75,10 @@ function isBrokenDiagonalRendering() {
     drawTestTriangle(ctx, 4, 5, 4, 0);
     drawTestTriangle(ctx, 4, 5, 0, 5);
     const data = ctx.getImageData(0, 0, 3, 3).data;
-    brokenDiagonalRendering_ = verifyBrokenDiagonalRendering(data, 0) ||
-        verifyBrokenDiagonalRendering(data, 4) ||
-        verifyBrokenDiagonalRendering(data, 8);
+    brokenDiagonalRendering_ =
+      verifyBrokenDiagonalRendering(data, 0) ||
+      verifyBrokenDiagonalRendering(data, 4) ||
+      verifyBrokenDiagonalRendering(data, 8);
   }
 
   return brokenDiagonalRendering_;
@@ -82,13 +96,20 @@ function isBrokenDiagonalRendering() {
  * @param {number} targetResolution Target resolution.
  * @return {number} The best resolution to use. Can be +-Infinity, NaN or 0.
  */
-export function calculateSourceResolution(sourceProj, targetProj,
-  targetCenter, targetResolution) {
-
+export function calculateSourceResolution(
+  sourceProj,
+  targetProj,
+  targetCenter,
+  targetResolution
+) {
   const sourceCenter = transform(targetCenter, targetProj, sourceProj);
 
   // calculate the ideal resolution of the source data
-  let sourceResolution = getPointResolution(targetProj, targetResolution, targetCenter);
+  let sourceResolution = getPointResolution(
+    targetProj,
+    targetResolution,
+    targetCenter
+  );
 
   const targetMetersPerUnit = targetProj.getMetersPerUnit();
   if (targetMetersPerUnit !== undefined) {
@@ -105,8 +126,9 @@ export function calculateSourceResolution(sourceProj, targetProj,
 
   const sourceExtent = sourceProj.getExtent();
   if (!sourceExtent || containsCoordinate(sourceExtent, sourceCenter)) {
-    const compensationFactor = getPointResolution(sourceProj, sourceResolution, sourceCenter) /
-        sourceResolution;
+    const compensationFactor =
+      getPointResolution(sourceProj, sourceResolution, sourceCenter) /
+      sourceResolution;
     if (isFinite(compensationFactor) && compensationFactor > 0) {
       sourceResolution /= compensationFactor;
     }
@@ -114,7 +136,6 @@ export function calculateSourceResolution(sourceProj, targetProj,
 
   return sourceResolution;
 }
-
 
 /**
  * Calculates ideal resolution to use from the source in order to achieve
@@ -128,22 +149,34 @@ export function calculateSourceResolution(sourceProj, targetProj,
  * @param {number} targetResolution Target resolution.
  * @return {number} The best resolution to use. Can be +-Infinity, NaN or 0.
  */
-export function calculateSourceExtentResolution(sourceProj, targetProj,
-  targetExtent, targetResolution) {
-
+export function calculateSourceExtentResolution(
+  sourceProj,
+  targetProj,
+  targetExtent,
+  targetResolution
+) {
   const targetCenter = getCenter(targetExtent);
-  let sourceResolution = calculateSourceResolution(sourceProj, targetProj, targetCenter, targetResolution);
+  let sourceResolution = calculateSourceResolution(
+    sourceProj,
+    targetProj,
+    targetCenter,
+    targetResolution
+  );
 
   if (!isFinite(sourceResolution) || sourceResolution <= 0) {
-    forEachCorner(targetExtent, function(corner) {
-      sourceResolution = calculateSourceResolution(sourceProj, targetProj, corner, targetResolution);
+    forEachCorner(targetExtent, function (corner) {
+      sourceResolution = calculateSourceResolution(
+        sourceProj,
+        targetProj,
+        corner,
+        targetResolution
+      );
       return isFinite(sourceResolution) && sourceResolution > 0;
     });
   }
 
   return sourceResolution;
 }
-
 
 /**
  * Renders the source data into new canvas based on the triangulation.
@@ -165,12 +198,24 @@ export function calculateSourceExtentResolution(sourceProj, targetProj,
  * @param {object=} opt_contextOptions Properties to set on the canvas context.
  * @return {HTMLCanvasElement} Canvas with reprojected data.
  */
-export function render(width, height, pixelRatio,
-  sourceResolution, sourceExtent, targetResolution, targetExtent,
-  triangulation, sources, gutter, opt_renderEdges, opt_contextOptions) {
-
-  const context = createCanvasContext2D(Math.round(pixelRatio * width),
-    Math.round(pixelRatio * height));
+export function render(
+  width,
+  height,
+  pixelRatio,
+  sourceResolution,
+  sourceExtent,
+  targetResolution,
+  targetExtent,
+  triangulation,
+  sources,
+  gutter,
+  opt_renderEdges,
+  opt_contextOptions
+) {
+  const context = createCanvasContext2D(
+    Math.round(pixelRatio * width),
+    Math.round(pixelRatio * height)
+  );
   assign(context, opt_contextOptions);
 
   if (sources.length === 0) {
@@ -186,20 +231,21 @@ export function render(width, height, pixelRatio,
   context.globalCompositeOperation = 'lighter';
 
   const sourceDataExtent = createEmpty();
-  sources.forEach(function(src, i, arr) {
+  sources.forEach(function (src, i, arr) {
     extend(sourceDataExtent, src.extent);
   });
 
   const canvasWidthInUnits = getWidth(sourceDataExtent);
   const canvasHeightInUnits = getHeight(sourceDataExtent);
   const stitchContext = createCanvasContext2D(
-    Math.round(pixelRatio * canvasWidthInUnits / sourceResolution),
-    Math.round(pixelRatio * canvasHeightInUnits / sourceResolution));
+    Math.round((pixelRatio * canvasWidthInUnits) / sourceResolution),
+    Math.round((pixelRatio * canvasHeightInUnits) / sourceResolution)
+  );
   assign(stitchContext, opt_contextOptions);
 
   const stitchScale = pixelRatio / sourceResolution;
 
-  sources.forEach(function(src, i, arr) {
+  sources.forEach(function (src, i, arr) {
     const xPos = src.extent[0] - sourceDataExtent[0];
     const yPos = -(src.extent[3] - sourceDataExtent[3]);
     const srcWidth = getWidth(src.extent);
@@ -209,16 +255,21 @@ export function render(width, height, pixelRatio,
     if (src.image.width > 0 && src.image.height > 0) {
       stitchContext.drawImage(
         src.image,
-        gutter, gutter,
-        src.image.width - 2 * gutter, src.image.height - 2 * gutter,
-        xPos * stitchScale, yPos * stitchScale,
-        srcWidth * stitchScale, srcHeight * stitchScale);
+        gutter,
+        gutter,
+        src.image.width - 2 * gutter,
+        src.image.height - 2 * gutter,
+        xPos * stitchScale,
+        yPos * stitchScale,
+        srcWidth * stitchScale,
+        srcHeight * stitchScale
+      );
     }
   });
 
   const targetTopLeft = getTopLeft(targetExtent);
 
-  triangulation.getTriangles().forEach(function(triangle, i, arr) {
+  triangulation.getTriangles().forEach(function (triangle, i, arr) {
     /* Calculate affine transform (src -> dst)
      * Resulting matrix can be used to transform coordinate
      * from `sourceProjection` to destination pixels.
@@ -241,15 +292,25 @@ export function render(width, height, pixelRatio,
      */
     const source = triangle.source;
     const target = triangle.target;
-    let x0 = source[0][0], y0 = source[0][1];
-    let x1 = source[1][0], y1 = source[1][1];
-    let x2 = source[2][0], y2 = source[2][1];
-    const u0 = (target[0][0] - targetTopLeft[0]) / targetResolution;
-    const v0 = -(target[0][1] - targetTopLeft[1]) / targetResolution;
-    const u1 = (target[1][0] - targetTopLeft[0]) / targetResolution;
-    const v1 = -(target[1][1] - targetTopLeft[1]) / targetResolution;
-    const u2 = (target[2][0] - targetTopLeft[0]) / targetResolution;
-    const v2 = -(target[2][1] - targetTopLeft[1]) / targetResolution;
+    let x0 = source[0][0],
+      y0 = source[0][1];
+    let x1 = source[1][0],
+      y1 = source[1][1];
+    let x2 = source[2][0],
+      y2 = source[2][1];
+    // Make sure that everything is on pixel boundaries
+    const u0 = pixelRound((target[0][0] - targetTopLeft[0]) / targetResolution);
+    const v0 = pixelRound(
+      -(target[0][1] - targetTopLeft[1]) / targetResolution
+    );
+    const u1 = pixelRound((target[1][0] - targetTopLeft[0]) / targetResolution);
+    const v1 = pixelRound(
+      -(target[1][1] - targetTopLeft[1]) / targetResolution
+    );
+    const u2 = pixelRound((target[2][0] - targetTopLeft[0]) / targetResolution);
+    const v2 = pixelRound(
+      -(target[2][1] - targetTopLeft[1]) / targetResolution
+    );
 
     // Shift all the source points to improve numerical stability
     // of all the subsequent calculations. The [x0, y0] is used here.
@@ -267,7 +328,7 @@ export function render(width, height, pixelRatio,
       [x1, y1, 0, 0, u1 - u0],
       [x2, y2, 0, 0, u2 - u0],
       [0, 0, x1, y1, v1 - v0],
-      [0, 0, x2, y2, v2 - v0]
+      [0, 0, x2, y2, v2 - v0],
     ];
     const affineCoefs = solveLinearSystem(augmentedMatrix);
     if (!affineCoefs) {
@@ -277,30 +338,32 @@ export function render(width, height, pixelRatio,
     context.save();
     context.beginPath();
 
-    if (isBrokenDiagonalRendering()) {
-      // Make sure that everything is on pixel boundaries
-      const u0r = pixelRound(u0);
-      const v0r = pixelRound(v0);
-      const u1r = pixelRound(u1);
-      const v1r = pixelRound(v1);
-      const u2r = pixelRound(u2);
-      const v2r = pixelRound(v2);
+    if (
+      isBrokenDiagonalRendering() ||
+      opt_contextOptions === IMAGE_SMOOTHING_DISABLED
+    ) {
       // Make sure that all lines are horizontal or vertical
-      context.moveTo(u1r, v1r);
+      context.moveTo(u1, v1);
       // This is the diagonal line. Do it in 4 steps
       const steps = 4;
-      const ud = u0r - u1r;
-      const vd = v0r - v1r;
+      const ud = u0 - u1;
+      const vd = v0 - v1;
       for (let step = 0; step < steps; step++) {
         // Go horizontally
-        context.lineTo(u1r + pixelRound((step + 1) * ud / steps), v1r + pixelRound(step * vd / (steps - 1)));
+        context.lineTo(
+          u1 + pixelRound(((step + 1) * ud) / steps),
+          v1 + pixelRound((step * vd) / (steps - 1))
+        );
         // Go vertically
-        if (step != (steps - 1)) {
-          context.lineTo(u1r + pixelRound((step + 1) * ud / steps), v1r + pixelRound((step + 1) * vd / (steps - 1)));
+        if (step != steps - 1) {
+          context.lineTo(
+            u1 + pixelRound(((step + 1) * ud) / steps),
+            v1 + pixelRound(((step + 1) * vd) / (steps - 1))
+          );
         }
       }
       // We are almost at u0r, v0r
-      context.lineTo(u2r, v2r);
+      context.lineTo(u2, v2);
     } else {
       context.moveTo(u1, v1);
       context.lineTo(u0, v0);
@@ -310,13 +373,23 @@ export function render(width, height, pixelRatio,
     context.clip();
 
     context.transform(
-      affineCoefs[0], affineCoefs[2], affineCoefs[1], affineCoefs[3], u0, v0);
+      affineCoefs[0],
+      affineCoefs[2],
+      affineCoefs[1],
+      affineCoefs[3],
+      u0,
+      v0
+    );
 
-    context.translate(sourceDataExtent[0] - sourceNumericalShiftX,
-      sourceDataExtent[3] - sourceNumericalShiftY);
+    context.translate(
+      sourceDataExtent[0] - sourceNumericalShiftX,
+      sourceDataExtent[3] - sourceNumericalShiftY
+    );
 
-    context.scale(sourceResolution / pixelRatio,
-      -sourceResolution / pixelRatio);
+    context.scale(
+      sourceResolution / pixelRatio,
+      -sourceResolution / pixelRatio
+    );
 
     context.drawImage(stitchContext.canvas, 0, 0);
     context.restore();
@@ -325,10 +398,11 @@ export function render(width, height, pixelRatio,
   if (opt_renderEdges) {
     context.save();
 
+    context.globalCompositeOperation = 'source-over';
     context.strokeStyle = 'black';
     context.lineWidth = 1;
 
-    triangulation.getTriangles().forEach(function(triangle, i, arr) {
+    triangulation.getTriangles().forEach(function (triangle, i, arr) {
       const target = triangle.target;
       const u0 = (target[0][0] - targetTopLeft[0]) / targetResolution;
       const v0 = -(target[0][1] - targetTopLeft[1]) / targetResolution;

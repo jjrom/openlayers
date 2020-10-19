@@ -1,21 +1,19 @@
 /**
  * @module ol/renderer/Map
  */
-import {abstract} from '../util.js';
 import Disposable from '../Disposable.js';
-import {getWidth} from '../extent.js';
 import {TRUE} from '../functions.js';
-import {inView} from '../layer/Layer.js';
-import {shared as iconImageCache} from '../style/IconImageCache.js';
+import {abstract} from '../util.js';
 import {compose as composeTransform, makeInverse} from '../transform.js';
-import {renderDeclutterItems} from '../render.js';
+import {getWidth} from '../extent.js';
+import {shared as iconImageCache} from '../style/IconImageCache.js';
+import {inView} from '../layer/Layer.js';
 import {wrapX} from '../coordinate.js';
 
 /**
  * @abstract
  */
 class MapRenderer extends Disposable {
-
   /**
    * @param {import("../PluggableMap.js").default} map Map.
    */
@@ -27,12 +25,6 @@ class MapRenderer extends Disposable {
      * @type {import("../PluggableMap.js").default}
      */
     this.map_ = map;
-
-    /**
-     * @private
-     */
-    this.declutterTree_ = null;
-
   }
 
   /**
@@ -53,11 +45,16 @@ class MapRenderer extends Disposable {
     const coordinateToPixelTransform = frameState.coordinateToPixelTransform;
     const pixelToCoordinateTransform = frameState.pixelToCoordinateTransform;
 
-    composeTransform(coordinateToPixelTransform,
-      frameState.size[0] / 2, frameState.size[1] / 2,
-      1 / viewState.resolution, -1 / viewState.resolution,
+    composeTransform(
+      coordinateToPixelTransform,
+      frameState.size[0] / 2,
+      frameState.size[1] / 2,
+      1 / viewState.resolution,
+      -1 / viewState.resolution,
       -viewState.rotation,
-      -viewState.center[0], -viewState.center[1]);
+      -viewState.center[0],
+      -viewState.center[1]
+    );
 
     makeInverse(pixelToCoordinateTransform, coordinateToPixelTransform);
   }
@@ -113,29 +110,35 @@ class MapRenderer extends Disposable {
 
     const layerStates = frameState.layerStatesArray;
     const numLayers = layerStates.length;
-    let declutteredFeatures;
-    if (this.declutterTree_) {
-      declutteredFeatures = this.declutterTree_.all().map(function(entry) {
-        return entry.value;
-      });
-    }
 
     const tmpCoord = [];
     for (let i = 0; i < offsets.length; i++) {
       for (let j = numLayers - 1; j >= 0; --j) {
         const layerState = layerStates[j];
         const layer = /** @type {import("../layer/Layer.js").default} */ (layerState.layer);
-        if (layer.hasRenderer() && inView(layerState, viewState) && layerFilter.call(thisArg2, layer)) {
+        if (
+          layer.hasRenderer() &&
+          inView(layerState, viewState) &&
+          layerFilter.call(thisArg2, layer)
+        ) {
           const layerRenderer = layer.getRenderer();
           const source = layer.getSource();
           if (layerRenderer && source) {
-            const coordinates = source.getWrapX() ? translatedCoordinate : coordinate;
-            const callback = forEachFeatureAtCoordinate.bind(null, layerState.managed);
+            const coordinates = source.getWrapX()
+              ? translatedCoordinate
+              : coordinate;
+            const callback = forEachFeatureAtCoordinate.bind(
+              null,
+              layerState.managed
+            );
             tmpCoord[0] = coordinates[0] + offsets[i][0];
             tmpCoord[1] = coordinates[1] + offsets[i][1];
             result = layerRenderer.forEachFeatureAtCoordinate(
               tmpCoord,
-              frameState, hitTolerance, callback, declutteredFeatures);
+              frameState,
+              hitTolerance,
+              callback
+            );
           }
           if (result) {
             return result;
@@ -151,14 +154,14 @@ class MapRenderer extends Disposable {
    * @param {import("../pixel.js").Pixel} pixel Pixel.
    * @param {import("../PluggableMap.js").FrameState} frameState FrameState.
    * @param {number} hitTolerance Hit tolerance in pixels.
-   * @param {function(this: S, import("../layer/Layer.js").default, (Uint8ClampedArray|Uint8Array)): T} callback Layer
+   * @param {function(import("../layer/Layer.js").default, (Uint8ClampedArray|Uint8Array)): T} callback Layer
    *     callback.
-   * @param {function(this: U, import("../layer/Layer.js").default): boolean} layerFilter Layer filter
+   * @param {function(import("../layer/Layer.js").default): boolean} layerFilter Layer filter
    *     function, only layers which are visible and for which this function
    *     returns `true` will be tested for features.  By default, all visible
    *     layers will be tested.
    * @return {T|undefined} Callback result.
-   * @template S,T,U
+   * @template T
    */
   forEachLayerAtPixel(pixel, frameState, hitTolerance, callback, layerFilter) {
     return abstract();
@@ -177,9 +180,24 @@ class MapRenderer extends Disposable {
    * @return {boolean} Is there a feature at the given coordinate?
    * @template U
    */
-  hasFeatureAtCoordinate(coordinate, frameState, hitTolerance, checkWrapped, layerFilter, thisArg) {
+  hasFeatureAtCoordinate(
+    coordinate,
+    frameState,
+    hitTolerance,
+    checkWrapped,
+    layerFilter,
+    thisArg
+  ) {
     const hasFeature = this.forEachFeatureAtCoordinate(
-      coordinate, frameState, hitTolerance, checkWrapped, TRUE, this, layerFilter, thisArg);
+      coordinate,
+      frameState,
+      hitTolerance,
+      checkWrapped,
+      TRUE,
+      this,
+      layerFilter,
+      thisArg
+    );
 
     return hasFeature !== undefined;
   }
@@ -193,10 +211,11 @@ class MapRenderer extends Disposable {
 
   /**
    * Render.
+   * @abstract
    * @param {?import("../PluggableMap.js").FrameState} frameState Frame state.
    */
   renderFrame(frameState) {
-    this.declutterTree_ = renderDeclutterItems(frameState, this.declutterTree_);
+    abstract();
   }
 
   /**
@@ -209,7 +228,6 @@ class MapRenderer extends Disposable {
     }
   }
 }
-
 
 /**
  * @param {import("../PluggableMap.js").default} map Map.

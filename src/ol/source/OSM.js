@@ -4,7 +4,6 @@
 
 import XYZ from './XYZ.js';
 
-
 /**
  * The attribution containing a link to the OpenStreetMap Copyright and License
  * page.
@@ -12,15 +11,15 @@ import XYZ from './XYZ.js';
  * @type {string}
  * @api
  */
-export const ATTRIBUTION = '&#169; ' +
-      '<a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> ' +
-      'contributors.';
-
+export const ATTRIBUTION =
+  '&#169; ' +
+  '<a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> ' +
+  'contributors.';
 
 /**
  * @typedef {Object} Options
  * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
- * @property {number} [cacheSize] Tile cache size. The default depends on the screen size. Will be ignored if too small.
+ * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
  * @property {null|string} [crossOrigin='anonymous'] The `crossOrigin` attribute for loaded images.  Note that
  * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
  * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
@@ -40,7 +39,6 @@ export const ATTRIBUTION = '&#169; ' +
  * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
  */
 
-
 /**
  * @classdesc
  * Layer source for the OpenStreetMap tile server.
@@ -51,7 +49,6 @@ class OSM extends XYZ {
    * @param {Options=} [opt_options] Open Street Map options.
    */
   constructor(opt_options) {
-
     const options = opt_options || {};
 
     let attributions;
@@ -61,11 +58,13 @@ class OSM extends XYZ {
       attributions = [ATTRIBUTION];
     }
 
-    const crossOrigin = options.crossOrigin !== undefined ?
-      options.crossOrigin : 'anonymous';
+    const crossOrigin =
+      options.crossOrigin !== undefined ? options.crossOrigin : 'anonymous';
 
-    const url = options.url !== undefined ?
-      options.url : 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const url =
+      options.url !== undefined
+        ? options.url
+        : 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
     super({
       attributions: attributions,
@@ -78,11 +77,9 @@ class OSM extends XYZ {
       tileLoadFunction: options.tileLoadFunction,
       url: url,
       wrapX: options.wrapX,
-      attributionsCollapsible: false
+      attributionsCollapsible: false,
     });
-
   }
-
 }
 
 export default OSM;
