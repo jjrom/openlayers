@@ -47,7 +47,7 @@ The default `geometryFunction` can only handle `ol/geom/Point` geometries.
 
 ### 11
 
-`options.featureTypes` should be an Array.
+`options.featureTypes` must be an Array.
 
 ### 12
 
@@ -111,7 +111,7 @@ Features for `updates` must have an id set by the feature reader or `ol.Feature#
 
 ### 28
 
-`renderMode` must be `'image'`, `'hybrid'` or `'vector'`.
+`renderMode` must be `'hybrid'` or `'vector'`.
 
 ### 29
 
@@ -232,10 +232,6 @@ Cannot determine IIIF Image API version from provided image information JSON.
 ### 62
 
 A `WebGLArrayBuffer` must either be of type `ELEMENT_ARRAY_BUFFER` or `ARRAY_BUFFER`.
-
-### 63
-
-Support for the `OES_element_index_uint` WebGL extension is mandatory for WebGL layers.
 
 ### 64
 
