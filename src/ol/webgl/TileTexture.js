@@ -5,6 +5,7 @@
 import EventTarget from '../events/Target.js';
 import EventType from '../events/EventType.js';
 import ImageTile from '../ImageTile.js';
+import ReprojTile from '../reproj/Tile.js';
 import TileState from '../TileState.js';
 import WebGLArrayBuffer from './Buffer.js';
 import {ARRAY_BUFFER, STATIC_DRAW} from '../webgl.js';
@@ -85,9 +86,13 @@ function uploadDataTexture(helper, texture, data, size, bandCount) {
   );
 }
 
+/**
+ * @typedef {import("../DataTile.js").default|ImageTile|ReprojTile} TileType
+ */
+
 class TileTexture extends EventTarget {
   /**
-   * @param {import("../DataTile.js").default|import("../ImageTile.js").default} tile The tile.
+   * @param {TileType} tile The tile.
    * @param {import("../tilegrid/TileGrid.js").default} grid Tile grid.
    * @param {import("../webgl/Helper.js").default} helper WebGL helper.
    */
@@ -95,7 +100,7 @@ class TileTexture extends EventTarget {
     super();
 
     /**
-     * @type {import("../DataTile.js").default|import("../ImageTile.js").default}
+     * @type {TileType}
      */
     this.tile;
 
@@ -129,7 +134,7 @@ class TileTexture extends EventTarget {
   }
 
   /**
-   * @param {import("../DataTile.js").default|import("../ImageTile.js").default} tile Tile.
+   * @param {TileType} tile Tile.
    */
   setTile(tile) {
     if (tile !== this.tile) {
@@ -152,7 +157,7 @@ class TileTexture extends EventTarget {
     const gl = helper.getGL();
     const tile = this.tile;
 
-    if (tile instanceof ImageTile) {
+    if (tile instanceof ImageTile || tile instanceof ReprojTile) {
       const texture = gl.createTexture();
       this.textures.push(texture);
       this.bandCount = 4;

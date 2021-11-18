@@ -8,12 +8,15 @@ import ImageLayer from '../../../../src/ol/layer/Image.js';
 import ImageState from '../../../../src/ol/ImageState.js';
 import ImageStatic from '../../../../src/ol/source/ImageStatic.js';
 import Interaction from '../../../../src/ol/interaction/Interaction.js';
+import Layer from '../../../../src/ol/layer/Layer.js';
+import LayerGroup from '../../../../src/ol/layer/Group.js';
 import Map from '../../../../src/ol/Map.js';
 import MapBrowserEvent from '../../../../src/ol/MapBrowserEvent.js';
 import MapEvent from '../../../../src/ol/MapEvent.js';
 import MouseWheelZoom from '../../../../src/ol/interaction/MouseWheelZoom.js';
 import Overlay from '../../../../src/ol/Overlay.js';
 import PinchZoom from '../../../../src/ol/interaction/PinchZoom.js';
+import Property from '../../../../src/ol/layer/Property.js';
 import Select from '../../../../src/ol/interaction/Select.js';
 import TileLayer from '../../../../src/ol/layer/Tile.js';
 import TileLayerRenderer from '../../../../src/ol/renderer/canvas/TileLayer.js';
@@ -166,6 +169,7 @@ describe('ol/Map', function () {
       map.addLayer(layer);
 
       expect(map.getLayers().item(0)).to.be(layer);
+      expect(layer.get(Property.MAP)).to.be(map);
     });
 
     it('throws if a layer is added twice', function () {
@@ -177,6 +181,55 @@ describe('ol/Map', function () {
         map.addLayer(layer);
       };
       expect(call).to.throwException();
+    });
+  });
+
+  describe('#removeLayer()', function () {
+    it('removes a layer from the map', function () {
+      const map = new Map({});
+      const layer = new TileLayer();
+      map.addLayer(layer);
+
+      expect(layer.get(Property.MAP)).to.be(map);
+      map.removeLayer(layer);
+      expect(layer.get(Property.MAP)).to.be(null);
+    });
+
+    it('removes a layer group from the map', function () {
+      const map = new Map({});
+      const layer = new TileLayer();
+      const group = new LayerGroup({layers: [layer]});
+      map.addLayer(group);
+      expect(layer.get(Property.MAP)).to.be(map);
+
+      map.removeLayer(group);
+      expect(layer.get(Property.MAP)).to.be(null);
+    });
+  });
+
+  describe('#setLayerGroup()', function () {
+    it('sets the layer group', function () {
+      const map = new Map({});
+
+      const layer = new Layer({});
+      const group = new LayerGroup({layers: [layer]});
+      map.setLayerGroup(group);
+
+      expect(map.getLayerGroup()).to.be(group);
+      expect(layer.get(Property.MAP)).to.be(map);
+    });
+
+    it('removes the map property from old layers', function () {
+      const oldLayer = new Layer({});
+      const map = new Map({layers: [oldLayer]});
+      expect(oldLayer.get(Property.MAP)).to.be(map);
+
+      const layer = new Layer({});
+      const group = new LayerGroup({layers: [layer]});
+      map.setLayerGroup(group);
+
+      expect(layer.get(Property.MAP)).to.be(map);
+      expect(oldLayer.get(Property.MAP)).to.be(null);
     });
   });
 
@@ -192,12 +245,21 @@ describe('ol/Map', function () {
       expect(collection.getLength()).to.be(2);
       expect(collection.item(0)).to.be(layer0);
       expect(collection.item(1)).to.be(layer1);
+      expect(layer0.get(Property.MAP)).to.be(map);
+      expect(layer1.get(Property.MAP)).to.be(map);
     });
 
     it('clears any existing layers', function () {
-      const map = new Map({layers: [new TileLayer()]});
+      const oldLayer = new TileLayer();
+      const map = new Map({layers: [oldLayer]});
+      expect(oldLayer.get(Property.MAP)).to.be(map);
 
-      map.setLayers([new TileLayer(), new TileLayer()]);
+      const newLayer1 = new TileLayer();
+      const newLayer2 = new TileLayer();
+      map.setLayers([newLayer1, newLayer2]);
+      expect(newLayer1.get(Property.MAP)).to.be(map);
+      expect(newLayer2.get(Property.MAP)).to.be(map);
+      expect(oldLayer.get(Property.MAP)).to.be(null);
 
       expect(map.getLayers().getLength()).to.be(2);
     });
@@ -816,7 +878,7 @@ describe('ol/Map', function () {
 
     it('removes window listeners', function () {
       map.dispose();
-      expect(map.handleResize_).to.be(undefined);
+      expect(map.targetChangeHandlerKeys_).to.be(null);
     });
   });
 
@@ -828,7 +890,7 @@ describe('ol/Map', function () {
       map = new Map({
         target: document.createElement('div'),
       });
-      expect(map.handleResize_).to.be.ok();
+      expect(map.targetChangeHandlerKeys_).to.be.ok();
     });
 
     describe('map with target not attached to dom', function () {
@@ -840,7 +902,7 @@ describe('ol/Map', function () {
     describe('call setTarget with null', function () {
       it('unregisters the viewport resize listener', function () {
         map.setTarget(null);
-        expect(map.handleResize_).to.be(undefined);
+        expect(map.targetChangeHandlerKeys_).to.be(null);
       });
     });
 
@@ -848,7 +910,7 @@ describe('ol/Map', function () {
       it('registers a viewport resize listener', function () {
         map.setTarget(null);
         map.setTarget(document.createElement('div'));
-        expect(map.handleResize_).to.be.ok();
+        expect(map.targetChangeHandlerKeys_).to.be.ok();
       });
     });
   });
@@ -877,7 +939,13 @@ describe('ol/Map', function () {
               hasAttribute: function (attribute) {
                 return hasTabIndex;
               },
+              contains: function () {
+                return hasFocus;
+              },
             };
+          },
+          getOwnerDocument: function () {
+            return {};
           },
         },
         originalEvent: {

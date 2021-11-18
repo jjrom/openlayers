@@ -16,6 +16,7 @@ import {assign} from '../obj.js';
 import {createCanvasContext2D} from '../dom.js';
 import {create as createTransform} from '../transform.js';
 import {equals, getCenter, getHeight, getWidth} from '../extent.js';
+import {getUid} from '../util.js';
 
 let hasImageData = true;
 try {
@@ -646,6 +647,7 @@ class RasterSource extends ImageSource {
       }),
       viewHints: [],
       wantedTiles: {},
+      mapId: getUid(this),
     };
 
     this.setAttributions(function (frameState) {
@@ -862,7 +864,9 @@ class RasterSource extends ImageSource {
     this.dispatchEvent(
       new RasterSourceEvent(RasterEventType.AFTEROPERATIONS, frameState, data)
     );
-    requestAnimationFrame(this.changed.bind(this));
+    if (frameState.animate) {
+      requestAnimationFrame(this.changed.bind(this));
+    }
   }
 
   disposeInternal() {
