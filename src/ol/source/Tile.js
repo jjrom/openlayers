@@ -34,10 +34,12 @@ import {scale as scaleSize, toSize} from '../size.js';
  * @property {import("../proj.js").ProjectionLike} [projection] Projection.
  * @property {import("./State.js").default} [state] State.
  * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] TileGrid.
- * @property {boolean} [wrapX=true] WrapX.
+ * @property {boolean} [wrapX=false] WrapX.
  * @property {number} [transition] Transition.
  * @property {string} [key] Key.
  * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0] ZDirection.
+ * @property {boolean} [interpolate=false] Use interpolated values when resampling.  By default,
+ * the nearest neighbor is used when resampling.
  */
 
 /**
@@ -59,6 +61,7 @@ class TileSource extends Source {
       projection: options.projection,
       state: options.state,
       wrapX: options.wrapX,
+      interpolate: options.interpolate,
     });
 
     /***
@@ -90,7 +93,6 @@ class TileSource extends Source {
       options.tilePixelRatio !== undefined ? options.tilePixelRatio : 1;
 
     /**
-     * @protected
      * @type {import("../tilegrid/TileGrid.js").default}
      */
     this.tileGrid = options.tileGrid !== undefined ? options.tileGrid : null;
@@ -123,7 +125,10 @@ class TileSource extends Source {
      * @protected
      * @type {import("../Tile.js").Options}
      */
-    this.tileOptions = {transition: options.transition};
+    this.tileOptions = {
+      transition: options.transition,
+      interpolate: options.interpolate,
+    };
 
     /**
      * zDirection hint, read by the renderer. Indicates which resolution should be used

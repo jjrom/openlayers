@@ -31,7 +31,7 @@ import {numberSafeCompareFunction} from '../../array.js';
 import {toSize} from '../../size.js';
 
 export const Uniforms = {
-  TILE_TEXTURE_PREFIX: 'u_tileTexture',
+  TILE_TEXTURE_ARRAY: 'u_tileTextures',
   TILE_TRANSFORM: 'u_tileTransform',
   TRANSITION_ALPHA: 'u_transitionAlpha',
   DEPTH: 'u_depth',
@@ -97,6 +97,16 @@ function getRenderExtent(frameState, extent) {
       fromUserExtent(layerState.extent, frameState.viewState.projection)
     );
   }
+  const source =
+    /** {import("../../source/Tile.js").default} */ layerState.layer.getSource();
+  if (!source.getWrapX()) {
+    const gridExtent = source
+      .getTileGridForProjection(frameState.viewState.projection)
+      .getExtent();
+    if (gridExtent) {
+      extent = getIntersection(extent, gridExtent);
+    }
+  }
   return extent;
 }
 
@@ -106,6 +116,7 @@ function getRenderExtent(frameState, extent) {
  * @property {string} fragmentShader Fragment shader source.
  * @property {Object<string, import("../../webgl/Helper").UniformValue>} [uniforms] Additional uniforms
  * made available to shaders.
+ * @property {Array<import("../../webgl/PaletteTexture.js").default>} [paletteTextures] Palette textures.
  * @property {number} [cacheSize=512] The texture cache size.
  */
 
@@ -203,6 +214,31 @@ class WebGLTileLayerRenderer extends WebGLLayerRenderer {
      * @private
      */
     this.tileTextureCache_ = new LRUCache(cacheSize);
+
+    /**
+     * @type {Array<import("../../webgl/PaletteTexture.js").default>}
+     * @private
+     */
+    this.paletteTextures_ = options.paletteTextures || [];
+  }
+
+  /**
+   * @param {Options} options Options.
+   */
+  reset(options) {
+    super.reset({
+      uniforms: options.uniforms,
+    });
+    this.vertexShader_ = options.vertexShader;
+    this.fragmentShader_ = options.fragmentShader;
+    this.paletteTextures_ = options.paletteTextures || [];
+
+    if (this.helper) {
+      this.program_ = this.helper.getProgram(
+        this.fragmentShader_,
+        this.vertexShader_
+      );
+    }
   }
 
   afterHelperCreated() {
@@ -236,11 +272,13 @@ class WebGLTileLayerRenderer extends WebGLLayerRenderer {
    * @return {boolean} Layer is ready to be rendered.
    */
   prepareFrameInternal(frameState) {
-    if (isEmpty(getRenderExtent(frameState, frameState.extent))) {
+    const layer = this.getLayer();
+    const source = layer.getSource();
+    if (!source) {
       return false;
     }
-    const source = this.getLayer().getSource();
-    if (!source) {
+
+    if (isEmpty(getRenderExtent(frameState, frameState.extent))) {
       return false;
     }
     return source.getState() === State.READY;
@@ -248,7 +286,7 @@ class WebGLTileLayerRenderer extends WebGLLayerRenderer {
 
   /**
    * @param {import("../../PluggableMap.js").FrameState} frameState Frame state.
-   * @param {import("../../extent.js").Extent} extent The extent.
+   * @param {import("../../extent.js").Extent} extent The extent to be rendered.
    * @param {number} z The zoom level.
    * @param {Object<number, Array<TileTexture>>} tileTexturesByZ The zoom level.
    */
@@ -258,7 +296,11 @@ class WebGLTileLayerRenderer extends WebGLLayerRenderer {
     const tileSource = tileLayer.getSource();
     const tileGrid = tileSource.getTileGridForProjection(viewState.projection);
     const tileTextureCache = this.tileTextureCache_;
-    const tileRange = tileGrid.getTileRangeForExtentAndZ(extent, z);
+    const tileRange = tileGrid.getTileRangeForExtentAndZ(
+      extent,
+      z,
+      this.tempTileRange_
+    );
 
     const tileSourceKey = getUid(tileSource);
     if (!(tileSourceKey in frameState.wantedTiles)) {
@@ -341,10 +383,10 @@ class WebGLTileLayerRenderer extends WebGLLayerRenderer {
     this.preRender(gl, frameState);
 
     const viewState = frameState.viewState;
-    const extent = getRenderExtent(frameState, frameState.extent);
     const tileLayer = this.getLayer();
     const tileSource = tileLayer.getSource();
     const tileGrid = tileSource.getTileGridForProjection(viewState.projection);
+    const extent = getRenderExtent(frameState, frameState.extent);
     const z = tileGrid.getZForResolution(
       viewState.resolution,
       tileSource.zDirection
@@ -482,19 +524,33 @@ class WebGLTileLayerRenderer extends WebGLLayerRenderer {
         this.helper.bindBuffer(this.indices_);
         this.helper.enableAttributes(attributeDescriptions);
 
-        for (
-          let textureIndex = 0;
-          textureIndex < tileTexture.textures.length;
-          ++textureIndex
-        ) {
-          const textureProperty = 'TEXTURE' + textureIndex;
-          const uniformName = Uniforms.TILE_TEXTURE_PREFIX + textureIndex;
+        let textureSlot = 0;
+        while (textureSlot < tileTexture.textures.length) {
+          const textureProperty = 'TEXTURE' + textureSlot;
+          const uniformName = `${Uniforms.TILE_TEXTURE_ARRAY}[${textureSlot}]`;
           gl.activeTexture(gl[textureProperty]);
-          gl.bindTexture(gl.TEXTURE_2D, tileTexture.textures[textureIndex]);
+          gl.bindTexture(gl.TEXTURE_2D, tileTexture.textures[textureSlot]);
           gl.uniform1i(
             this.helper.getUniformLocation(uniformName),
-            textureIndex
+            textureSlot
           );
+          ++textureSlot;
+        }
+
+        for (
+          let paletteIndex = 0;
+          paletteIndex < this.paletteTextures_.length;
+          ++paletteIndex
+        ) {
+          const paletteTexture = this.paletteTextures_[paletteIndex];
+          gl.activeTexture(gl['TEXTURE' + textureSlot]);
+          const texture = paletteTexture.getTexture(gl);
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.uniform1i(
+            this.helper.getUniformLocation(paletteTexture.name),
+            textureSlot
+          );
+          ++textureSlot;
         }
 
         const alpha =
@@ -524,7 +580,11 @@ class WebGLTileLayerRenderer extends WebGLLayerRenderer {
       }
     }
 
-    this.helper.finalizeDraw(frameState);
+    this.helper.finalizeDraw(
+      frameState,
+      this.dispatchPreComposeEvent,
+      this.dispatchPostComposeEvent
+    );
 
     const canvas = this.helper.getCanvas();
 

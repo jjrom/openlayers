@@ -49,7 +49,7 @@ import {wrapX as wrapCoordinateX} from '../../coordinate.js';
  */
 class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
   /**
-   * @param {import("../../layer/Vector.js").default} vectorLayer Vector layer.
+   * @param {import("../../layer/BaseVector.js").default} vectorLayer Vector layer.
    */
   constructor(vectorLayer) {
     super(vectorLayer);
@@ -233,7 +233,12 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
 
     const canvasTransform = transformToString(this.pixelTransform);
 
-    this.useContainer(target, canvasTransform, layerState.opacity);
+    this.useContainer(
+      target,
+      canvasTransform,
+      layerState.opacity,
+      this.getBackground(frameState)
+    );
     const context = this.context;
     const canvas = context.canvas;
 

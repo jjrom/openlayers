@@ -2,11 +2,13 @@
  * @module ol/layer/WebGLTile
  */
 import BaseTileLayer from './BaseTile.js';
+import LayerProperty from '../layer/Property.js';
 import WebGLTileLayerRenderer, {
   Attributes,
   Uniforms,
 } from '../renderer/webgl/TileLayer.js';
 import {
+  PALETTE_TEXTURE_ARRAY,
   ValueTypes,
   expressionToGlsl,
   getStringNumberEquivalent,
@@ -76,6 +78,7 @@ import {assign} from '../obj.js';
  * @property {string} vertexShader The vertex shader.
  * @property {string} fragmentShader The fragment shader.
  * @property {Object<string,import("../webgl/Helper.js").UniformValue>} uniforms Uniform definitions.
+ * @property {Array<import("../webgl/PaletteTexture.js").default>} paletteTextures Palette textures.
  */
 
 /**
@@ -105,6 +108,7 @@ function parseStyle(style, bandCount) {
     variables: [],
     attributes: [],
     stringLiteralsMap: {},
+    functions: {},
     bandCount: bandCount,
   };
 
@@ -203,14 +207,21 @@ function parseStyle(style, bandCount) {
   });
 
   const textureCount = Math.ceil(bandCount / 4);
-  const colorAssignments = new Array(textureCount);
-  for (let textureIndex = 0; textureIndex < textureCount; ++textureIndex) {
-    const uniformName = Uniforms.TILE_TEXTURE_PREFIX + textureIndex;
-    uniformDeclarations.push(`uniform sampler2D ${uniformName};`);
-    colorAssignments[
-      textureIndex
-    ] = `vec4 color${textureIndex} = texture2D(${uniformName}, v_textureCoord);`;
+  uniformDeclarations.push(
+    `uniform sampler2D ${Uniforms.TILE_TEXTURE_ARRAY}[${textureCount}];`
+  );
+
+  if (context.paletteTextures) {
+    uniformDeclarations.push(
+      `uniform sampler2D ${PALETTE_TEXTURE_ARRAY}[${context.paletteTextures.length}];`
+    );
   }
+
+  const functionDefintions = Object.keys(context.functions).map(function (
+    name
+  ) {
+    return context.functions[name];
+  });
 
   const fragmentShader = `
     #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -228,10 +239,12 @@ function parseStyle(style, bandCount) {
 
     ${uniformDeclarations.join('\n')}
 
-    void main() {
-      ${colorAssignments.join('\n')}
+    ${functionDefintions.join('\n')}
 
-      vec4 color = color0;
+    void main() {
+      vec4 color = texture2D(${
+        Uniforms.TILE_TEXTURE_ARRAY
+      }[0],  v_textureCoord);
 
       ${pipeline.join('\n')}
 
@@ -248,6 +261,7 @@ function parseStyle(style, bandCount) {
     vertexShader: vertexShader,
     fragmentShader: fragmentShader,
     uniforms: uniforms,
+    paletteTextures: context.paletteTextures,
   };
 }
 
@@ -259,7 +273,7 @@ function parseStyle(style, bandCount) {
  * property on the layer object; for example, setting `title: 'My Title'` in the
  * options means that `title` is observable, and has get/set accessors.
  *
- * @extends BaseTileLayer<SourceType>
+ * @extends BaseTileLayer<SourceType, WebGLTileLayerRenderer>
  * @api
  */
 class WebGLTileLayer extends BaseTileLayer {
@@ -294,26 +308,55 @@ class WebGLTileLayer extends BaseTileLayer {
      * @private
      */
     this.styleVariables_ = this.style_.variables || {};
+
+    this.addChangeListener(LayerProperty.SOURCE, this.handleSourceUpdate_);
   }
 
   /**
-   * Create a renderer for this layer.
-   * @return {import("../renderer/Layer.js").default} A layer renderer.
-   * @protected
+   * @private
    */
-  createRenderer() {
+  handleSourceUpdate_() {
+    this.setStyle(this.style_);
+  }
+
+  /**
+   * @private
+   * @return {number} The number of source bands.
+   */
+  getSourceBandCount_() {
     const source = this.getSource();
-    const parsedStyle = parseStyle(
-      this.style_,
-      'bandCount' in source ? source.bandCount : 4
-    );
+    return source && 'bandCount' in source ? source.bandCount : 4;
+  }
+
+  createRenderer() {
+    const parsedStyle = parseStyle(this.style_, this.getSourceBandCount_());
 
     return new WebGLTileLayerRenderer(this, {
       vertexShader: parsedStyle.vertexShader,
       fragmentShader: parsedStyle.fragmentShader,
       uniforms: parsedStyle.uniforms,
       cacheSize: this.cacheSize_,
+      paletteTextures: parsedStyle.paletteTextures,
     });
+  }
+
+  /**
+   * Update the layer style.  The `updateStyleVariables` function is a more efficient
+   * way to update layer rendering.  In cases where the whole style needs to be updated,
+   * this method may be called instead.
+   * @param {Style} style The new style.
+   */
+  setStyle(style) {
+    this.style_ = style;
+    const parsedStyle = parseStyle(this.style_, this.getSourceBandCount_());
+    const renderer = this.getRenderer();
+    renderer.reset({
+      vertexShader: parsedStyle.vertexShader,
+      fragmentShader: parsedStyle.fragmentShader,
+      uniforms: parsedStyle.uniforms,
+      paletteTextures: parsedStyle.paletteTextures,
+    });
+    this.changed();
   }
 
   /**

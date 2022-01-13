@@ -1,6 +1,6 @@
 {
   "name": "ol",
-  "version": "6.9.1-dev",
+  "version": "6.11.1-dev",
   "description": "OpenLayers mapping library",
   "keywords": [
     "map",
@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "geotiff": "^1.0.8",
-    "ol-mapbox-style": "^6.5.1",
+    "ol-mapbox-style": "^6.8.2",
     "pbf": "3.2.1",
     "rbush": "^3.0.1"
   },
@@ -63,8 +63,8 @@
     "@types/topojson-specification": "^1.0.1",
     "babel-loader": "^8.2.2",
     "chaikin-smooth": "^1.0.4",
-    "clean-css-cli": "5.4.2",
-    "copy-webpack-plugin": "^9.0.0",
+    "clean-css-cli": "5.5.0",
+    "copy-webpack-plugin": "^10.0.0",
     "es-main": "^1.0.2",
     "eslint": "^8.0.1",
     "eslint-config-openlayers": "^16.0.1",
@@ -85,12 +85,12 @@
     "karma-source-map-support": "^1.4.0",
     "karma-webpack": "^5.0.0",
     "loglevelnext": "^5.0.5",
-    "marked": "4.0.3",
+    "marked": "4.0.9",
     "mocha": "9.1.3",
     "pixelmatch": "^5.1.0",
     "pngjs": "^6.0.0",
     "proj4": "^2.7.5",
-    "puppeteer": "11.0.0",
+    "puppeteer": "13.0.1",
     "regenerator-runtime": "^0.13.9",
     "rollup": "^2.42.3",
     "rollup-plugin-terser": "^7.0.2",

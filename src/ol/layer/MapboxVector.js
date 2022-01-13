@@ -7,7 +7,7 @@ import MVT from '../format/MVT.js';
 import SourceState from '../source/State.js';
 import VectorTileLayer from '../layer/VectorTile.js';
 import VectorTileSource from '../source/VectorTile.js';
-import {applyStyle, setupVectorSource} from 'ol-mapbox-style';
+import {applyBackground, applyStyle, setupVectorSource} from 'ol-mapbox-style';
 
 const mapboxBaseUrl = 'https://api.mapbox.com';
 
@@ -29,13 +29,14 @@ export function getMapboxPath(url) {
  * Turns mapbox:// sprite URLs into resolvable URLs.
  * @param {string} url The sprite URL.
  * @param {string} token The access token.
+ * @param {string} styleUrl The style URL.
  * @return {string} A resolvable URL.
  * @private
  */
-export function normalizeSpriteUrl(url, token) {
+export function normalizeSpriteUrl(url, token, styleUrl) {
   const mapboxPath = getMapboxPath(url);
   if (!mapboxPath) {
-    return url;
+    return decodeURI(new URL(url, styleUrl).href);
   }
   const startsWith = 'sprites/';
   if (mapboxPath.indexOf(startsWith) !== 0) {
@@ -50,13 +51,14 @@ export function normalizeSpriteUrl(url, token) {
  * Turns mapbox:// glyphs URLs into resolvable URLs.
  * @param {string} url The glyphs URL.
  * @param {string} token The access token.
+ * @param {string} styleUrl The style URL.
  * @return {string} A resolvable URL.
  * @private
  */
-export function normalizeGlyphsUrl(url, token) {
+export function normalizeGlyphsUrl(url, token, styleUrl) {
   const mapboxPath = getMapboxPath(url);
   if (!mapboxPath) {
-    return url;
+    return decodeURI(new URL(url, styleUrl).href);
   }
   const startsWith = 'fonts/';
   if (mapboxPath.indexOf(startsWith) !== 0) {
@@ -77,7 +79,7 @@ export function normalizeGlyphsUrl(url, token) {
 export function normalizeStyleUrl(url, token) {
   const mapboxPath = getMapboxPath(url);
   if (!mapboxPath) {
-    return url;
+    return decodeURI(new URL(url, location.href).href);
   }
   const startsWith = 'styles/';
   if (mapboxPath.indexOf(startsWith) !== 0) {
@@ -93,16 +95,17 @@ export function normalizeStyleUrl(url, token) {
  * @param {string} url The source URL.
  * @param {string} token The access token.
  * @param {string} tokenParam The access token key.
+ * @param {string} styleUrl The style URL.
  * @return {string} A vector tile template.
  * @private
  */
-export function normalizeSourceUrl(url, token, tokenParam) {
+export function normalizeSourceUrl(url, token, tokenParam, styleUrl) {
+  const urlObject = new URL(url, styleUrl);
   const mapboxPath = getMapboxPath(url);
   if (!mapboxPath) {
     if (!token) {
-      return url;
+      return decodeURI(urlObject.href);
     }
-    const urlObject = new URL(url, location.href);
     urlObject.searchParams.set(tokenParam, token);
     return decodeURI(urlObject.href);
   }
@@ -153,7 +156,10 @@ const SourceType = {
 /**
  * @typedef {Object} LayerObject
  * @property {string} id The layer id.
+ * @property {string} type The layer type.
  * @property {string} source The source id.
+ * @property {Object} layout The layout.
+ * @property {Object} paint The paint.
  */
 
 /**
@@ -176,6 +182,9 @@ const SourceType = {
  * is defined by the z-index of the layer, the `zIndex` of the style and the render order of features.
  * Higher z-index means higher priority. Within the same z-index, a feature rendered before another has
  * higher priority.
+ * @property {import("./Base.js").BackgroundColor|false} [background] Background color for the layer.
+ * If not specified, the background from the Mapbox style object will be used. Set to `false` to prevent
+ * the Mapbox style's background from being used.
  * @property {string} [className='ol-layer'] A CSS class name to set to the layer element.
  * @property {number} [opacity=1] Opacity (0, 1).
  * @property {boolean} [visible=true] Visibility.
@@ -188,9 +197,11 @@ const SourceType = {
  * @property {number} [minResolution] The minimum resolution (inclusive) at which this layer will be
  * visible.
  * @property {number} [maxResolution] The maximum resolution (exclusive) below which this layer will
- * be visible.
- * @property {number} [minZoom] The minimum view zoom level (exclusive) above which this layer will be
- * visible.
+ * be visible. If neither `maxResolution` nor `minZoom` are defined, the layer's `maxResolution` will
+ * match the style source's `minzoom`.
+ * @property {number} [minZoom] The minimum view zoom level (exclusive) above which this layer will
+ * be visible. If neither `maxResolution` nor `minZoom` are defined, the layer's `minZoom` will match
+ * the style source's `minzoom`.
  * @property {number} [maxZoom] The maximum view zoom level (inclusive) at which this layer will
  * be visible.
  * @property {import("../render.js").OrderFunction} [renderOrder] Render order. Function to be used when sorting
@@ -269,6 +280,7 @@ class MapboxVectorLayer extends VectorTileLayer {
 
     super({
       source: source,
+      background: options.background,
       declutter: declutter,
       className: options.className,
       opacity: options.opacity,
@@ -289,8 +301,12 @@ class MapboxVectorLayer extends VectorTileLayer {
       properties: options.properties,
     });
 
+    this.setMaxResolutionFromTileGrid_ =
+      options.maxResolution === undefined && options.minZoom === undefined;
+
     this.sourceId = options.source;
     this.layers = options.layers;
+
     if (options.accessToken) {
       this.accessToken = options.accessToken;
     } else {
@@ -321,7 +337,7 @@ class MapboxVectorLayer extends VectorTileLayer {
         return response.json();
       })
       .then((style) => {
-        this.onStyleLoad(style);
+        this.onStyleLoad(style, url.startsWith('data:') ? location.href : url);
       })
       .catch((error) => {
         this.handleError(error);
@@ -331,9 +347,10 @@ class MapboxVectorLayer extends VectorTileLayer {
   /**
    * Handle the loaded style object.
    * @param {StyleObject} style The loaded style.
+   * @param {string} styleUrl The URL of the style.
    * @protected
    */
-  onStyleLoad(style) {
+  onStyleLoad(style, styleUrl) {
     let sourceId;
     let sourceIdOrLayersList;
     if (this.layers) {
@@ -379,11 +396,19 @@ class MapboxVectorLayer extends VectorTileLayer {
     }
 
     if (style.sprite) {
-      style.sprite = normalizeSpriteUrl(style.sprite, this.accessToken);
+      style.sprite = normalizeSpriteUrl(
+        style.sprite,
+        this.accessToken,
+        styleUrl
+      );
     }
 
     if (style.glyphs) {
-      style.glyphs = normalizeGlyphsUrl(style.glyphs, this.accessToken);
+      style.glyphs = normalizeGlyphsUrl(
+        style.glyphs,
+        this.accessToken,
+        styleUrl
+      );
     }
 
     const styleSource = style.sources[sourceId];
@@ -395,21 +420,19 @@ class MapboxVectorLayer extends VectorTileLayer {
     }
 
     const source = this.getSource();
-    if (
-      styleSource.url.indexOf('mapbox://') === 0 ||
-      styleSource.url.indexOf('{z}') !== -1
-    ) {
+    if (styleSource.url && styleSource.url.indexOf('mapbox://') === 0) {
       // Tile source url, handle it directly
       source.setUrl(
         normalizeSourceUrl(
           styleSource.url,
           this.accessToken,
-          this.accessTokenParam_
+          this.accessTokenParam_,
+          styleUrl
         )
       );
       applyStyle(this, style, sourceIdOrLayersList)
         .then(() => {
-          source.setState(SourceState.READY);
+          this.configureSource(source, style);
         })
         .catch((error) => {
           this.handleError(error);
@@ -418,27 +441,60 @@ class MapboxVectorLayer extends VectorTileLayer {
       // TileJSON url, let ol-mapbox-style handle it
       if (styleSource.tiles) {
         styleSource.tiles = styleSource.tiles.map((url) =>
-          normalizeSourceUrl(url, this.accessToken, this.accessTokenParam_)
+          normalizeSourceUrl(
+            url,
+            this.accessToken,
+            this.accessTokenParam_,
+            styleUrl
+          )
         );
       }
       setupVectorSource(
         styleSource,
-        normalizeSourceUrl(
-          styleSource.url,
-          this.accessToken,
-          this.accessTokenParam_
-        )
+        styleSource.url
+          ? normalizeSourceUrl(
+              styleSource.url,
+              this.accessToken,
+              this.accessTokenParam_,
+              styleUrl
+            )
+          : undefined
       ).then((source) => {
         applyStyle(this, style, sourceIdOrLayersList)
           .then(() => {
-            this.setSource(source);
+            this.configureSource(source, style);
           })
           .catch((error) => {
-            this.setSource(source);
+            this.configureSource(source, style);
             this.handleError(error);
           });
       });
     }
+  }
+
+  /**
+   * Applies configuration from the provided source to this layer's source,
+   * and reconfigures the loader to add a feature that renders the background,
+   * if the style is configured with a background.
+   * @param {import("../source/VectorTile.js").default} source The source to configure from.
+   * @param {StyleObject} style The style to configure the background from.
+   */
+  configureSource(source, style) {
+    const targetSource = this.getSource();
+    if (source !== targetSource) {
+      targetSource.setAttributions(source.getAttributions());
+      targetSource.setTileUrlFunction(source.getTileUrlFunction());
+      targetSource.setTileLoadFunction(source.getTileLoadFunction());
+      targetSource.tileGrid = source.tileGrid;
+    }
+    if (this.getBackground() === undefined) {
+      applyBackground(this, style);
+    }
+    if (this.setMaxResolutionFromTileGrid_) {
+      const tileGrid = targetSource.getTileGrid();
+      this.setMaxResolution(tileGrid.getResolution(tileGrid.getMinZoom()));
+    }
+    targetSource.setState(SourceState.READY);
   }
 
   /**

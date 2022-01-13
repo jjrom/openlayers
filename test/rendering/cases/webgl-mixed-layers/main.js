@@ -46,6 +46,7 @@ new Map({
     }),
     new TileLayer({
       source: new DataTile({
+        wrapX: true,
         loader: function (z, x, y) {
           const half = labelCanvasSize / 2;
 
@@ -66,7 +67,7 @@ new Map({
             labelCanvasSize,
             labelCanvasSize
           ).data;
-          return Promise.resolve(new Uint8Array(data.buffer));
+          return new Uint8Array(data.buffer);
         },
         transition: 0,
       }),

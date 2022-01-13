@@ -4,6 +4,7 @@
 import CanvasLayerRenderer from './Layer.js';
 import ViewHint from '../../ViewHint.js';
 import {ENABLE_RASTER_REPROJECTION} from '../../reproj/common.js';
+import {IMAGE_SMOOTHING_DISABLED} from './common.js';
 import {assign} from '../../obj.js';
 import {compose as composeTransform, makeInverse} from '../../transform.js';
 import {containsExtent, intersects as intersectsExtent} from '../../extent.js';
@@ -134,7 +135,12 @@ class CanvasImageLayerRenderer extends CanvasLayerRenderer {
 
     const canvasTransform = toTransformString(this.pixelTransform);
 
-    this.useContainer(target, canvasTransform, layerState.opacity);
+    this.useContainer(
+      target,
+      canvasTransform,
+      layerState.opacity,
+      this.getBackground(frameState)
+    );
 
     const context = this.context;
     const canvas = context.canvas;
@@ -179,7 +185,10 @@ class CanvasImageLayerRenderer extends CanvasLayerRenderer {
     const dw = img.width * transform[0];
     const dh = img.height * transform[3];
 
-    assign(context, this.getLayer().getSource().getContextOptions());
+    if (!this.getLayer().getSource().getInterpolate()) {
+      assign(context, IMAGE_SMOOTHING_DISABLED);
+    }
+
     this.preRender(context, frameState);
     if (render && dw >= 0.5 && dh >= 0.5) {
       const dx = transform[4];

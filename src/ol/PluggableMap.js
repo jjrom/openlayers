@@ -62,6 +62,7 @@ import {removeNode} from './dom.js';
  * @property {Array<number>} viewHints ViewHints.
  * @property {!Object<string, Object<string, boolean>>} wantedTiles WantedTiles.
  * @property {string} mapId The id of the map.
+ * @property {Object<string, boolean>} renderTargets Identifiers of previously rendered elements.
  */
 
 /**
@@ -207,6 +208,12 @@ class PluggableMap extends BaseObject {
     this.un;
 
     const optionsInternal = createOptionsInternal(options);
+
+    /**
+     * @private
+     * @type {boolean}
+     */
+    this.renderComplete_;
 
     /** @private */
     this.boundHandleBrowserEvent_ = this.handleBrowserEvent.bind(this);
@@ -658,12 +665,34 @@ class PluggableMap extends BaseObject {
   }
 
   /**
+   * Get all layers from all layer groups.
+   * @return {Array<import("./layer/Layer.js").default>} Layers.
+   */
+  getAllLayers() {
+    const layers = [];
+    function addLayersFrom(layerGroup) {
+      layerGroup.forEach(function (layer) {
+        if (layer instanceof LayerGroup) {
+          addLayersFrom(layer.getLayers());
+        } else {
+          layers.push(layer);
+        }
+      });
+    }
+    addLayersFrom(this.getLayers());
+    return layers;
+  }
+
+  /**
    * Detect layers that have a color value at a pixel on the viewport, and
    * execute a callback with each matching layer. Layers included in the
    * detection can be configured through `opt_layerFilter`.
    *
-   * Note: this may give false positives unless the map layers have had different `className`
-   * properties assigned to them.
+   * Note: In maps with more than one layer, this method will typically return pixel data
+   * representing the composed image of all layers visible at the given pixel – because layers
+   * will generally share the same rendering context.  To force layers to render separately, and
+   * to get pixel data representing only one layer at a time, you can assign each layer a unique
+   * `className` in its constructor.
    *
    * @param {import("./pixel.js").Pixel} pixel Pixel.
    * @param {function(this: S, import("./layer/Layer.js").default, (Uint8ClampedArray|Uint8Array)): T} callback
@@ -1150,8 +1179,7 @@ class PluggableMap extends BaseObject {
       frameState &&
       this.hasListener(RenderEventType.RENDERCOMPLETE) &&
       !frameState.animate &&
-      !this.tileQueue_.getTilesLoading() &&
-      !this.getLoading()
+      this.renderComplete_
     ) {
       this.renderer_.dispatchRenderEvent(
         RenderEventType.RENDERCOMPLETE,
@@ -1472,6 +1500,7 @@ class PluggableMap extends BaseObject {
         viewHints: viewHints,
         wantedTiles: {},
         mapId: getUid(this),
+        renderTargets: {},
       };
       if (viewState.nextCenter && viewState.nextResolution) {
         const rotation = isNaN(viewState.nextRotation)
@@ -1527,6 +1556,11 @@ class PluggableMap extends BaseObject {
     }
 
     this.dispatchEvent(new MapEvent(MapEventType.POSTRENDER, this, frameState));
+
+    this.renderComplete_ =
+      !this.tileQueue_.getTilesLoading() &&
+      !this.tileQueue_.getCount() &&
+      !this.getLoading();
 
     if (!this.postRenderTimeoutHandle_) {
       this.postRenderTimeoutHandle_ = setTimeout(() => {

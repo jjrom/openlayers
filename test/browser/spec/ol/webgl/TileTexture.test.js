@@ -7,6 +7,7 @@ import WebGLArrayBuffer from '../../../../../src/ol/webgl/Buffer.js';
 import WebGLTileLayer from '../../../../../src/ol/layer/WebGLTile.js';
 import {EXTENT as EPSG3857_EXTENT} from '../../../../../src/ol/proj/epsg3857.js';
 import {createCanvasContext2D} from '../../../../../src/ol/dom.js';
+import {get as getProjection} from '../../../../../src/ol/proj.js';
 
 describe('ol/webgl/TileTexture', function () {
   /** @type {TileTexture} */
@@ -31,6 +32,9 @@ describe('ol/webgl/TileTexture', function () {
 
     renderer = layer.createRenderer();
     renderer.prepareFrame({
+      viewState: {
+        projection: getProjection('EPSG:3857'),
+      },
       extent: EPSG3857_EXTENT,
       layerIndex: 0,
       layerStatesArray: [layer.getLayerState()],
@@ -71,6 +75,25 @@ describe('ol/webgl/TileTexture', function () {
     const imageTile = new ImageTile([0, 0, 0], TileState.LOADED);
     tileTexture.setTile(imageTile);
     expect(tileTexture.loaded).to.be(true);
+  });
+
+  it('sets anonymous cors mode for image tiles by default', function () {
+    const tile = new ImageTile([0, 0, 0], TileState.IDLE);
+    tileTexture.setTile(tile);
+    const image = tile.getImage();
+    expect(image.crossOrigin).to.be('anonymous');
+  });
+
+  it('resepects any existing cors mode', function () {
+    const tile = new ImageTile(
+      [0, 0, 0],
+      TileState.IDLE,
+      'https://example.com/tile.png',
+      'use-credentials'
+    );
+    tileTexture.setTile(tile);
+    const image = tile.getImage();
+    expect(image.crossOrigin).to.be('use-credentials');
   });
 
   it('registers and unregisters change listener', function () {

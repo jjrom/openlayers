@@ -4,6 +4,8 @@ import MapboxVectorLayer, {
   normalizeSpriteUrl,
   normalizeStyleUrl,
 } from '../../../../../src/ol/layer/MapboxVector.js';
+import {asString} from '../../../../../src/ol/color.js';
+import {unByKey} from '../../../../../src/ol/Observable.js';
 
 describe('ol/layer/MapboxVector', () => {
   describe('getMapboxPath()', () => {
@@ -61,12 +63,30 @@ describe('ol/layer/MapboxVector', () => {
         url: 'https://example.com/sprite',
         expected: 'https://example.com/sprite',
       },
+      {
+        url: '../sprite',
+        expected: 'https://example.com:8000/sprite',
+      },
+      {
+        url: '/sprite',
+        expected: 'https://example.com:8000/sprite',
+      },
+      {
+        url: './sprite',
+        expected: 'https://example.com:8000/mystyle/sprite',
+      },
     ];
 
     const token = 'test-token';
     for (const c of cases) {
       it(`works for ${c.url}`, () => {
-        expect(normalizeSpriteUrl(c.url, token)).to.be(c.expected);
+        expect(
+          normalizeSpriteUrl(
+            c.url,
+            token,
+            'https://example.com:8000/mystyle/style.json'
+          )
+        ).to.be(c.expected);
       });
     }
   });
@@ -112,13 +132,181 @@ describe('ol/layer/MapboxVector', () => {
                   type: 'vector',
                 },
               },
+              layers: [],
             })
           ),
       });
-      layer.on('change:source', function () {
-        // we only get here when a new source was set, which is what ol-mapbox-style's
-        // setupVectorSource() does.
-        done();
+      const source = layer.getSource();
+      const key = source.on('change', function () {
+        if (source.getState() === 'ready') {
+          unByKey(key);
+          expect(source.getTileUrlFunction()([0, 0, 0])).to.be(
+            'http://a.tiles.mapbox.com/v3/mapbox.geography-class/0/0/0.png'
+          );
+          done();
+        }
+      });
+    });
+  });
+
+  describe('maxResolution', function () {
+    const styleUrl =
+      'data:,' +
+      encodeURIComponent(
+        JSON.stringify({
+          version: 8,
+          sources: {
+            'foo': {
+              tiles: ['/spec/ol/data/{z}-{x}-{y}.vector.pbf'],
+              type: 'vector',
+              minzoom: 6,
+            },
+          },
+          layers: [],
+        })
+      );
+
+    it('accepts minZoom from configuration', function (done) {
+      const layer = new MapboxVectorLayer({
+        minZoom: 5,
+        styleUrl: styleUrl,
+      });
+      const source = layer.getSource();
+      source.on('change', function onchange() {
+        if (source.getState() === 'ready') {
+          source.un('change', onchange);
+          expect(layer.getMaxResolution()).to.be(Infinity);
+          done();
+        }
+      });
+    });
+
+    it('uses minZoom from source', function (done) {
+      const layer = new MapboxVectorLayer({
+        styleUrl: styleUrl,
+      });
+      const source = layer.getSource();
+      source.on('change', function onchange() {
+        if (source.getState() === 'ready') {
+          source.un('change', onchange);
+          expect(layer.getMaxResolution()).to.be(
+            source.getTileGrid().getResolution(6)
+          );
+          done();
+        }
+      });
+    });
+  });
+
+  describe('background', function () {
+    it('configures the layer with a background function', function (done) {
+      const layer = new MapboxVectorLayer({
+        styleUrl:
+          'data:,' +
+          encodeURIComponent(
+            JSON.stringify({
+              version: 8,
+              sources: {
+                'foo': {
+                  tiles: ['/spec/ol/data/{z}-{x}-{y}.vector.pbf'],
+                  type: 'vector',
+                },
+              },
+              layers: [
+                {
+                  id: 'background',
+                  type: 'background',
+                  paint: {
+                    'background-color': '#ff0000',
+                    'background-opacity': 0.8,
+                  },
+                },
+              ],
+            })
+          ),
+      });
+      const source = layer.getSource();
+      const key = source.on('change', function () {
+        if (source.getState() === 'ready') {
+          unByKey(key);
+          expect(layer.getBackground()(1)).to.eql(asString([255, 0, 0, 0.8]));
+          done();
+        }
+      });
+    });
+
+    it("avoids the style's background with `background: false`", function (done) {
+      const layer = new MapboxVectorLayer({
+        styleUrl:
+          'data:,' +
+          encodeURIComponent(
+            JSON.stringify({
+              version: 8,
+              sources: {
+                'foo': {
+                  tiles: ['/spec/ol/data/{z}-{x}-{y}.vector.pbf'],
+                  type: 'vector',
+                },
+              },
+              layers: [
+                {
+                  id: 'background',
+                  type: 'background',
+                  paint: {
+                    'background-color': '#ff0000',
+                    'background-opacity': 0.8,
+                  },
+                },
+              ],
+            })
+          ),
+        background: false,
+      });
+      const source = layer.getSource();
+      const key = source.on('change', function () {
+        if (source.getState() === 'ready') {
+          unByKey(key);
+          expect(layer.getBackground()).to.be(false);
+          done();
+        }
+      });
+    });
+
+    it('works for styles without background', function (done) {
+      const layer = new MapboxVectorLayer({
+        styleUrl:
+          'data:,' +
+          encodeURIComponent(
+            JSON.stringify({
+              version: 8,
+              sources: {
+                'foo': {
+                  tiles: ['/spec/ol/data/{z}-{x}-{y}.vector.pbf'],
+                  type: 'vector',
+                },
+              },
+              layers: [
+                {
+                  id: 'landuse',
+                  type: 'fill',
+                  source: 'foo',
+                  'source-layer': 'landuse',
+                  paint: {
+                    'fill-color': '#ff0000',
+                    'fill-opacity': 0.8,
+                  },
+                },
+              ],
+            })
+          ),
+      });
+      const source = layer.getSource();
+      const key = source.on('change', function () {
+        if (source.getState() === 'ready') {
+          unByKey(key);
+          expect(layer.getBackground()).to.be(undefined);
+          done();
+        }
       });
     });
   });

@@ -4,7 +4,11 @@
 import DataTile from './DataTile.js';
 import State from './State.js';
 import TileGrid from '../tilegrid/TileGrid.js';
-import {Pool, fromUrl as tiffFromUrl, fromUrls as tiffFromUrls} from 'geotiff';
+import {
+  Pool,
+  fromUrl as tiffFromUrl,
+  fromUrls as tiffFromUrls,
+} from 'geotiff/src/geotiff.js';
 import {
   Projection,
   get as getCachedProjection,
@@ -22,9 +26,13 @@ import {fromCode as unitsFromCode} from '../proj/Units.js';
  * @property {string} url URL for the source GeoTIFF.
  * @property {Array<string>} [overviews] List of any overview URLs.
  * @property {number} [min=0] The minimum source data value.  Rendered values are scaled from 0 to 1 based on
- * the configured min and max.
+ * the configured min and max.  If not provided and raster statistics are available, those will be used instead.
+ * If neither are available, the minimum for the data type will be used.  To disable this behavior, set
+ * the `normalize` option to `false` in the constructor.
  * @property {number} [max] The maximum source data value.  Rendered values are scaled from 0 to 1 based on
- * the configured min and max.
+ * the configured min and max.  If not provided and raster statistics are available, those will be used instead.
+ * If neither are available, the maximum for the data type will be used.  To disable this behavior, set
+ * the `normalize` option to `false` in the constructor.
  * @property {number} [nodata] Values to discard (overriding any nodata values in the metadata).
  * When provided, an additional alpha band will be added to the data.  Often the GeoTIFF metadata
  * will include information about nodata values, so you should only need to set this property if
@@ -59,6 +67,15 @@ import {fromCode as unitsFromCode} from '../proj/Units.js';
  */
 
 /**
+ * @typedef {Object} GDALMetadata
+ * @property {string} STATISTICS_MINIMUM The minimum value (as a string).
+ * @property {string} STATISTICS_MAXIMUM The maximum value (as a string).
+ */
+
+const STATISTICS_MAXIMUM = 'STATISTICS_MAXIMUM';
+const STATISTICS_MINIMUM = 'STATISTICS_MINIMUM';
+
+/**
  * @typedef {Object} GeoTIFFImage
  * @property {Object} fileDirectory The file directory.
  * @property {GeoKeys} geoKeys The parsed geo-keys.
@@ -73,6 +90,7 @@ import {fromCode as unitsFromCode} from '../proj/Units.js';
  * @property {function():number} getTileWidth Get the pixel width of image tiles.
  * @property {function():number} getTileHeight Get the pixel height of image tiles.
  * @property {function():number|null} getGDALNoData Get the nodata value (or null if none).
+ * @property {function():GDALMetadata|null} getGDALMetadata Get the raster stats (or null if none).
  * @property {function():number} getSamplesPerPixel Get the number of samples per pixel.
  */
 
@@ -294,12 +312,15 @@ function getMaxForDataType(array) {
  * reading GeoTIFFs with the purpose of displaying them as RGB images, setting this to `true` will
  * convert other color spaces (YCbCr, CMYK) to RGB.
  * @property {boolean} [normalize=true] By default, the source data is normalized to values between
- * 0 and 1 with scaling factors based on the `min` and `max` properties of each source.  If instead
- * you want to work with the raw values in a style expression, set this to `false`.  Setting this option
+ * 0 and 1 with scaling factors based on the raster statistics or `min` and `max` properties of each source.
+ * If instead you want to work with the raw values in a style expression, set this to `false`.  Setting this option
  * to `false` will make it so any `min` and `max` properties on sources are ignored.
  * @property {boolean} [opaque=false] Whether the layer is opaque.
  * @property {number} [transition=250] Duration of the opacity transition for rendering.
  * To disable the opacity transition, pass `transition: 0`.
+ * @property {boolean} [wrapX=false] Render tiles beyond the tile grid extent.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * the linear interpolation is used to resample the data.  If false, nearest neighbor is used.
  */
 
 /**
@@ -318,6 +339,8 @@ class GeoTIFFSource extends DataTile {
       projection: null,
       opaque: options.opaque,
       transition: options.transition,
+      interpolate: options.interpolate !== false,
+      wrapX: options.wrapX,
     });
 
     /**
@@ -351,6 +374,12 @@ class GeoTIFFSource extends DataTile {
      * @private
      */
     this.nodataValues_;
+
+    /**
+     * @type {Array<Array<GDALMetadata>>}
+     * @private
+     */
+    this.metadata_;
 
     /**
      * @type {boolean}
@@ -423,6 +452,7 @@ class GeoTIFFSource extends DataTile {
     let resolutions;
     const samplesPerPixel = new Array(sources.length);
     const nodataValues = new Array(sources.length);
+    const metadata = new Array(sources.length);
     let minZoom = 0;
 
     const sourceCount = sources.length;
@@ -436,10 +466,12 @@ class GeoTIFFSource extends DataTile {
       const sourceResolutions = new Array(imageCount);
 
       nodataValues[sourceIndex] = new Array(imageCount);
+      metadata[sourceIndex] = new Array(imageCount);
 
       for (let imageIndex = 0; imageIndex < imageCount; ++imageIndex) {
         const image = images[imageIndex];
         const nodataValue = image.getGDALNoData();
+        metadata[sourceIndex][imageIndex] = image.getGDALMetadata();
         nodataValues[sourceIndex][imageIndex] =
           nodataValue === null ? NaN : nodataValue;
 
@@ -534,6 +566,7 @@ class GeoTIFFSource extends DataTile {
 
     this.samplesPerPixel_ = samplesPerPixel;
     this.nodataValues_ = nodataValues;
+    this.metadata_ = metadata;
 
     // decide if we need to add an alpha band to handle nodata
     outer: for (let sourceIndex = 0; sourceIndex < sourceCount; ++sourceIndex) {
@@ -649,6 +682,7 @@ class GeoTIFFSource extends DataTile {
     const pixelCount = size[0] * size[1];
     const dataLength = pixelCount * bandCount;
     const normalize = this.normalize_;
+    const metadata = this.metadata_;
 
     return Promise.all(requests).then(function (sourceSamples) {
       /** @type {Uint8Array|Float32Array} */
@@ -669,11 +703,20 @@ class GeoTIFFSource extends DataTile {
           let max = source.max;
           let gain, bias;
           if (normalize) {
+            const stats = metadata[sourceIndex][0];
             if (min === undefined) {
-              min = getMinForDataType(sourceSamples[sourceIndex][0]);
+              if (stats && STATISTICS_MINIMUM in stats) {
+                min = parseFloat(stats[STATISTICS_MINIMUM]);
+              } else {
+                min = getMinForDataType(sourceSamples[sourceIndex][0]);
+              }
             }
             if (max === undefined) {
-              max = getMaxForDataType(sourceSamples[sourceIndex][0]);
+              if (stats && STATISTICS_MAXIMUM in stats) {
+                max = parseFloat(stats[STATISTICS_MAXIMUM]);
+              } else {
+                max = getMaxForDataType(sourceSamples[sourceIndex][0]);
+              }
             }
 
             gain = 255 / (max - min);
