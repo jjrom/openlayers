@@ -1,6 +1,8 @@
 import CanvasImageLayerRenderer from '../../../../../../src/ol/renderer/canvas/ImageLayer.js';
 import Feature from '../../../../../../src/ol/Feature.js';
 import ImageLayer from '../../../../../../src/ol/layer/Image.js';
+import ImageState from '../../../../../../src/ol/ImageState.js';
+import ImageWrapper from '../../../../../../src/ol/Image.js';
 import Map from '../../../../../../src/ol/Map.js';
 import Point from '../../../../../../src/ol/geom/Point.js';
 import Projection from '../../../../../../src/ol/proj/Projection.js';
@@ -10,7 +12,7 @@ import VectorSource from '../../../../../../src/ol/source/Vector.js';
 import View from '../../../../../../src/ol/View.js';
 import {get as getProj} from '../../../../../../src/ol/proj.js';
 
-describe('ol.renderer.canvas.ImageLayer', function () {
+describe('ol/renderer/canvas/ImageLayer', function () {
   describe('#forEachLayerAtCoordinate', function () {
     let map, target, source;
     beforeEach(function (done) {
@@ -301,6 +303,18 @@ describe('ol.renderer.canvas.ImageLayer', function () {
         done();
       });
     });
+
+    it('image smoothing is re-enabled after rendering', function (done) {
+      let context;
+      layer.on('postrender', function (e) {
+        context = e.context;
+        context.imageSmoothingEnabled = false;
+      });
+      map.on('postrender', function () {
+        expect(context.imageSmoothingEnabled).to.be(true);
+        done();
+      });
+    });
   });
 
   describe('Vector image rendering', function () {
@@ -432,6 +446,19 @@ describe('ol.renderer.canvas.ImageLayer', function () {
         } catch (e) {
           done(e);
         }
+      });
+    });
+    it('resets image when empty', function (done) {
+      const frameState = createLayerFrameState([0, 0, 100, 100]);
+      layer.getSource().on('imageloadend', function () {
+        if (renderer.prepareFrame(frameState)) {
+          renderer.renderFrame(frameState, null);
+        }
+        expect(renderer.image_).to.be.a(ImageWrapper);
+        renderer.image_.state = ImageState.EMPTY;
+        expect(renderer.prepareFrame(frameState)).to.be(false);
+        expect(renderer.image_).to.be(null);
+        done();
       });
     });
   });

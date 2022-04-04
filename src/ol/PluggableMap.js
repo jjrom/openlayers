@@ -73,7 +73,7 @@ import {removeNode} from './dom.js';
  * @typedef {Object} AtPixelOptions
  * @property {undefined|function(import("./layer/Layer.js").default<import("./source/Source").default>): boolean} [layerFilter] Layer filter
  * function. The filter function will receive one argument, the
- * {@link module:ol/layer/Layer layer-candidate} and it should return a boolean value.
+ * {@link module:ol/layer/Layer~Layer layer-candidate} and it should return a boolean value.
  * Only layers which are visible and for which this function returns `true`
  * will be tested for features. By default, all visible layers will be tested.
  * @property {number} [hitTolerance=0] Hit-detection tolerance in css pixels. Pixels
@@ -211,9 +211,15 @@ class PluggableMap extends BaseObject {
 
     /**
      * @private
-     * @type {boolean}
+     * @type {boolean|undefined}
      */
     this.renderComplete_;
+
+    /**
+     * @private
+     * @type {boolean}
+     */
+    this.loaded_ = true;
 
     /** @private */
     this.boundHandleBrowserEvent_ = this.handleBrowserEvent.bind(this);
@@ -391,7 +397,7 @@ class PluggableMap extends BaseObject {
     this.overlayIdIndex_ = {};
 
     /**
-     * @type {import("./renderer/Map.js").default}
+     * @type {import("./renderer/Map.js").default|null}
      * @private
      */
     this.renderer_ = null;
@@ -610,9 +616,9 @@ class PluggableMap extends BaseObject {
    * @param {import("./pixel.js").Pixel} pixel Pixel.
    * @param {function(import("./Feature.js").FeatureLike, import("./layer/Layer.js").default<import("./source/Source").default>, import("./geom/SimpleGeometry.js").default): T} callback Feature callback. The callback will be
    *     called with two arguments. The first argument is one
-   *     {@link module:ol/Feature feature} or
-   *     {@link module:ol/render/Feature render feature} at the pixel, the second is
-   *     the {@link module:ol/layer/Layer layer} of the feature and will be null for
+   *     {@link module:ol/Feature~Feature feature} or
+   *     {@link module:ol/render/Feature~RenderFeature render feature} at the pixel, the second is
+   *     the {@link module:ol/layer/Layer~Layer layer} of the feature and will be null for
    *     unmanaged layers. To stop detection, callback functions can return a
    *     truthy value.
    * @param {AtPixelOptions} [opt_options] Optional options.
@@ -622,7 +628,7 @@ class PluggableMap extends BaseObject {
    * @api
    */
   forEachFeatureAtPixel(pixel, callback, opt_options) {
-    if (!this.frameState_) {
+    if (!this.frameState_ || !this.renderer_) {
       return;
     }
     const coordinate = this.getCoordinateFromPixelInternal(pixel);
@@ -667,6 +673,7 @@ class PluggableMap extends BaseObject {
   /**
    * Get all layers from all layer groups.
    * @return {Array<import("./layer/Layer.js").default>} Layers.
+   * @api
    */
   getAllLayers() {
     const layers = [];
@@ -684,6 +691,9 @@ class PluggableMap extends BaseObject {
   }
 
   /**
+   * Please the `layer.getData()` method for {@link module:ol/layer/Tile~TileLayer#getData tile layers} or
+   * {@link module:ol/layer/Image~ImageLayer#getData image layers} instead of using this method.
+   *
    * Detect layers that have a color value at a pixel on the viewport, and
    * execute a callback with each matching layer. Layers included in the
    * detection can be configured through `opt_layerFilter`.
@@ -697,7 +707,7 @@ class PluggableMap extends BaseObject {
    * @param {import("./pixel.js").Pixel} pixel Pixel.
    * @param {function(this: S, import("./layer/Layer.js").default, (Uint8ClampedArray|Uint8Array)): T} callback
    *     Layer callback. This callback will receive two arguments: first is the
-   *     {@link module:ol/layer/Layer layer}, second argument is an array representing
+   *     {@link module:ol/layer/Layer~Layer layer}, second argument is an array representing
    *     [R, G, B, A] pixel values (0 - 255) and will be `null` for layer types
    *     that do not currently support this argument. To stop detection, callback
    *     functions can return a truthy value.
@@ -706,9 +716,10 @@ class PluggableMap extends BaseObject {
    * callback execution, or the first truthy callback return value.
    * @template S,T
    * @api
+   * @deprecated
    */
   forEachLayerAtPixel(pixel, callback, opt_options) {
-    if (!this.frameState_) {
+    if (!this.frameState_ || !this.renderer_) {
       return;
     }
     const options = opt_options || {};
@@ -733,7 +744,7 @@ class PluggableMap extends BaseObject {
    * @api
    */
   hasFeatureAtPixel(pixel, opt_options) {
-    if (!this.frameState_) {
+    if (!this.frameState_ || !this.renderer_) {
       return false;
     }
     const coordinate = this.getCoordinateFromPixelInternal(pixel);
@@ -942,12 +953,19 @@ class PluggableMap extends BaseObject {
   /**
    * @return {boolean} Layers have sources that are still loading.
    */
-  getLoading() {
+  getLoadingOrNotReady() {
     const layerStatesArray = this.getLayerGroup().getLayerStatesArray();
     for (let i = 0, ii = layerStatesArray.length; i < ii; ++i) {
-      const layer = layerStatesArray[i].layer;
+      const state = layerStatesArray[i];
+      if (!state.visible) {
+        continue;
+      }
+      const renderer = state.layer.getRenderer();
+      if (renderer && !renderer.ready) {
+        return true;
+      }
       const source = /** @type {import("./layer/Layer.js").default} */ (
-        layer
+        state.layer
       ).getSource();
       if (source && source.loading) {
         return true;
@@ -991,7 +1009,7 @@ class PluggableMap extends BaseObject {
 
   /**
    * Get the map renderer.
-   * @return {import("./renderer/Map.js").default} Renderer
+   * @return {import("./renderer/Map.js").default|null} Renderer
    */
   getRenderer() {
     return this.renderer_;
@@ -1175,16 +1193,26 @@ class PluggableMap extends BaseObject {
       }
     }
 
-    if (
-      frameState &&
-      this.hasListener(RenderEventType.RENDERCOMPLETE) &&
-      !frameState.animate &&
-      this.renderComplete_
-    ) {
-      this.renderer_.dispatchRenderEvent(
-        RenderEventType.RENDERCOMPLETE,
-        frameState
-      );
+    if (frameState && this.renderer_ && !frameState.animate) {
+      if (this.renderComplete_ === true) {
+        if (this.hasListener(RenderEventType.RENDERCOMPLETE)) {
+          this.renderer_.dispatchRenderEvent(
+            RenderEventType.RENDERCOMPLETE,
+            frameState
+          );
+        }
+        if (this.loaded_ === false) {
+          this.loaded_ = true;
+          this.dispatchEvent(
+            new MapEvent(MapEventType.LOADEND, this, frameState)
+          );
+        }
+      } else if (this.loaded_ === true) {
+        this.loaded_ = false;
+        this.dispatchEvent(
+          new MapEvent(MapEventType.LOADSTART, this, frameState)
+        );
+      }
     }
 
     const postRenderFunctions = this.postRenderFunctions_;
@@ -1517,7 +1545,9 @@ class PluggableMap extends BaseObject {
     }
 
     this.frameState_ = frameState;
-    this.renderer_.renderFrame(frameState);
+    /** @type {import("./renderer/Map.js").default} */ (
+      this.renderer_
+    ).renderFrame(frameState);
 
     if (frameState) {
       if (frameState.animate) {
@@ -1558,9 +1588,13 @@ class PluggableMap extends BaseObject {
     this.dispatchEvent(new MapEvent(MapEventType.POSTRENDER, this, frameState));
 
     this.renderComplete_ =
-      !this.tileQueue_.getTilesLoading() &&
-      !this.tileQueue_.getCount() &&
-      !this.getLoading();
+      this.hasListener(MapEventType.LOADSTART) ||
+      this.hasListener(MapEventType.LOADEND) ||
+      this.hasListener(RenderEventType.RENDERCOMPLETE)
+        ? !this.tileQueue_.getTilesLoading() &&
+          !this.tileQueue_.getCount() &&
+          !this.getLoadingOrNotReady()
+        : undefined;
 
     if (!this.postRenderTimeoutHandle_) {
       this.postRenderTimeoutHandle_ = setTimeout(() => {
