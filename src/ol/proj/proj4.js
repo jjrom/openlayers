@@ -2,7 +2,6 @@
  * @module ol/proj/proj4
  */
 import Projection from './Projection.js';
-import Units from './Units.js';
 import {
   addCoordinateTransforms,
   addEquivalentProjections,
@@ -14,7 +13,7 @@ import {get as getTransform} from './transforms.js';
 
 /**
  * Make projections defined in proj4 (with `proj4.defs()`) available in
- * OpenLayers.
+ * OpenLayers. Requires proj4 >= 2.8.0.
  *
  * This function should be called whenever changes are made to the proj4
  * registry, e.g. after calling `proj4.defs()`. Existing transforms will not be
@@ -33,7 +32,7 @@ export function register(proj4) {
       const def = proj4.defs(code);
       let units = def.units;
       if (!units && def.projName === 'longlat') {
-        units = Units.DEGREES;
+        units = 'degrees';
       }
       addProjection(
         new Projection({
