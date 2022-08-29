@@ -46,6 +46,7 @@
   "dependencies": {
     "earcut": "^2.2.3",
     "geotiff": "2.0.4",
+    "npm": "^8.18.0",
     "ol-mapbox-style": "9.0.0",
     "pbf": "3.2.1",
     "rbush": "^3.0.1"
