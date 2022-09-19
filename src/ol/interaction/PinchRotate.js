@@ -22,10 +22,10 @@ import {disable} from '../rotationconstraint.js';
  */
 class PinchRotate extends PointerInteraction {
   /**
-   * @param {Options} [opt_options] Options.
+   * @param {Options} [options] Options.
    */
-  constructor(opt_options) {
-    const options = opt_options ? opt_options : {};
+  constructor(options) {
+    options = options ? options : {};
 
     const pointerOptions = /** @type {import("./Pointer.js").Options} */ (
       options
@@ -133,9 +133,8 @@ class PinchRotate extends PointerInteraction {
       const view = map.getView();
       view.endInteraction(this.duration_);
       return false;
-    } else {
-      return true;
     }
+    return true;
   }
 
   /**
@@ -154,9 +153,8 @@ class PinchRotate extends PointerInteraction {
         map.getView().beginInteraction();
       }
       return true;
-    } else {
-      return false;
     }
+    return false;
   }
 }
 

@@ -37,10 +37,7 @@ describe('ol.control.ScaleLine', function () {
       it('defaults to "ol-scale-line"', function () {
         const ctrl = new ScaleLine();
         ctrl.setMap(map);
-        const element = document.querySelector(
-          '.ol-scale-line',
-          map.getTarget()
-        );
+        const element = document.querySelector('.ol-scale-line');
         expect(element).to.not.be(null);
         expect(element).to.be.a(HTMLDivElement);
       });
@@ -51,16 +48,10 @@ describe('ol.control.ScaleLine', function () {
         ctrl.setMap(map);
 
         // check that the default was not chosen
-        const element1 = document.querySelector(
-          '.ol-scale-line',
-          map.getTarget()
-        );
+        const element1 = document.querySelector('.ol-scale-line');
         expect(element1).to.be(null);
         // check if the configured classname was chosen
-        const element2 = document.querySelector(
-          '.humpty-dumpty',
-          map.getTarget()
-        );
+        const element2 = document.querySelector('.humpty-dumpty');
         expect(element2).to.not.be(null);
         expect(element2).to.be.a(HTMLDivElement);
       });
@@ -221,7 +212,7 @@ describe('ol.control.ScaleLine', function () {
 
       ctrl.setUnits('nautical');
       map.renderSync();
-      expect(ctrl.element.innerText).to.be('10000 nm');
+      expect(ctrl.element.innerText).to.be('10000 NM');
     });
   });
 
@@ -411,7 +402,7 @@ describe('ol.control.ScaleLine', function () {
       expect(ctrl.element.innerText).to.be('500 ft');
 
       ctrl.setUnits('nautical');
-      expect(ctrl.element.innerText).to.be('0.05 nm');
+      expect(ctrl.element.innerText).to.be('0.05 NM');
 
       ctrl.setUnits('us');
       expect(ctrl.element.innerText).to.be('500 ft');
@@ -440,7 +431,7 @@ describe('ol.control.ScaleLine', function () {
       expect(ctrl.element.innerText).to.be('5 in');
 
       ctrl.setUnits('nautical');
-      expect(ctrl.element.innerText).to.be('0.00005 nm');
+      expect(ctrl.element.innerText).to.be('0.00005 NM');
 
       ctrl.setUnits('us');
       expect(ctrl.element.innerText).to.be('5 in');
@@ -519,9 +510,8 @@ describe('ol.control.ScaleLine', function () {
         return 'mm';
       } else if (zoom > 10) {
         return 'm';
-      } else {
-        return 'km';
       }
+      return 'km';
     };
 
     const getImperialUnit = function (zoom) {
@@ -529,9 +519,8 @@ describe('ol.control.ScaleLine', function () {
         return 'in';
       } else if (zoom >= 10) {
         return 'ft';
-      } else {
-        return 'mi';
       }
+      return 'mi';
     };
 
     beforeEach(function () {
@@ -640,7 +629,7 @@ describe('ol.control.ScaleLine', function () {
         })
       );
       map.renderSync();
-      const element = document.querySelector('.ol-scale-text', map.getTarget());
+      const element = document.querySelector('.ol-scale-text');
       expect(element).to.not.be(null);
       expect(element).to.be.a(HTMLDivElement);
       const text = element.innerText;
@@ -661,7 +650,7 @@ describe('ol.control.ScaleLine', function () {
         })
       );
       map.renderSync();
-      const element = document.querySelector('.ol-scale-text', map.getTarget());
+      const element = document.querySelector('.ol-scale-text');
       expect(element).to.not.be(null);
       expect(element).to.be.a(HTMLDivElement);
       const text = element.innerText;
@@ -683,7 +672,7 @@ describe('ol.control.ScaleLine', function () {
         })
       );
       map.renderSync();
-      const element = document.querySelector('.ol-scale-text', map.getTarget());
+      const element = document.querySelector('.ol-scale-text');
       expect(element).to.not.be(null);
       expect(element).to.be.a(HTMLDivElement);
       const text = element.innerText;
@@ -705,7 +694,7 @@ describe('ol.control.ScaleLine', function () {
         })
       );
       map.renderSync();
-      const element = document.querySelector('.ol-scale-text', map.getTarget());
+      const element = document.querySelector('.ol-scale-text');
       expect(element).to.not.be(null);
       expect(element).to.be.a(HTMLDivElement);
       const text = element.innerText;
