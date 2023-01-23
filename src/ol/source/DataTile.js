@@ -29,6 +29,7 @@ import {toSize} from '../size.js';
  * @typedef {Object} Options
  * @property {Loader} [loader] Data loader.  Called with z, x, and y tile coordinates.
  * Returns {@link import("../DataTile.js").Data data} for a tile or a promise for the same.
+ * For loaders that generate images, the promise should not resolve until the image is loaded.
  * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
  * @property {boolean} [attributionsCollapsible=true] Attributions are collapsible.
  * @property {number} [maxZoom=42] Optional max zoom level. Not used if `tileGrid` is provided.
@@ -191,12 +192,12 @@ class DataTileSource extends TileSource {
    * @param {number} z Tile coordinate z.
    * @param {number} x Tile coordinate x.
    * @param {number} y Tile coordinate y.
-   * @param {import("../proj/Projection.js").default} targetProjection The output projection.
-   * @param {import("../proj/Projection.js").default} sourceProjection The input projection.
+   * @param {import("../proj/Projection.js").default} targetProj The output projection.
+   * @param {import("../proj/Projection.js").default} sourceProj The input projection.
    * @return {!DataTile} Tile.
    */
-  getReprojTile_(z, x, y, targetProjection, sourceProjection) {
-    const cache = this.getTileCacheForProjection(targetProjection);
+  getReprojTile_(z, x, y, targetProj, sourceProj) {
+    const cache = this.getTileCacheForProjection(targetProj);
     const tileCoordKey = getKeyZXY(z, x, y);
     if (cache.containsKey(tileCoordKey)) {
       const tile = cache.get(tileCoordKey);
@@ -218,27 +219,30 @@ class DataTileSource extends TileSource {
       })
     );
 
-    const sourceTileGrid = this.getTileGridForProjection(sourceProjection);
-    const targetTileGrid = this.getTileGridForProjection(targetProjection);
+    const sourceTileGrid = this.getTileGridForProjection(sourceProj);
+    const targetTileGrid = this.getTileGridForProjection(targetProj);
     const tileCoord = [z, x, y];
     const wrappedTileCoord = this.getTileCoordForTileUrlFunction(
       tileCoord,
-      targetProjection
+      targetProj
     );
-    const newTile = new ReprojDataTile(
-      sourceProjection,
-      sourceTileGrid,
-      targetProjection,
-      targetTileGrid,
-      tileCoord,
-      wrappedTileCoord,
-      reprojTilePixelRatio,
-      this.getGutterForProjection(sourceProjection),
-      function (z, x, y, pixelRatio) {
-        return this.getTile(z, x, y, pixelRatio, sourceProjection);
-      }.bind(this),
-      this.getInterpolate()
+
+    const options = Object.assign(
+      {
+        sourceProj,
+        sourceTileGrid,
+        targetProj,
+        targetTileGrid,
+        tileCoord,
+        wrappedTileCoord,
+        pixelRatio: reprojTilePixelRatio,
+        gutter: this.getGutterForProjection(sourceProj),
+        getTileFunction: (z, x, y, pixelRatio) =>
+          this.getTile(z, x, y, pixelRatio, sourceProj),
+      },
+      this.tileOptions
     );
+    const newTile = new ReprojDataTile(options);
     newTile.key = this.getKey();
     return newTile;
   }

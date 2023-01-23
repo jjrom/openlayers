@@ -76,7 +76,15 @@ OpenLayers appreciates contributions of all kinds.  We especially want to thank 
 
 > We develop leading Physical Security Information Management (PSIM) software.
 > OpenLayers is the core of our map engine and we love it! 
-> https://elacompil.recruitee.com/
+> https://ela.pl/
+
+<br>
+
+[![Ubigu Oy logo](./sponsor-logos/ubigu-oy.svg)](https://www.ubigu.fi/)
+
+> We advance holistic utilization and availability of spatial information,
+> for a better planned, built and managed society.
+> https://www.ubigu.fi/
 
 <br>
 

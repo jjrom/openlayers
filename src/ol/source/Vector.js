@@ -86,9 +86,9 @@ export class VectorSourceEvent extends Event {
  * Example:
  *
  * ```js
- * import {Vector} from 'ol/source';
- * import {GeoJSON} from 'ol/format';
- * import {bbox} from 'ol/loadingstrategy';
+ * import Vector from 'ol/source/Vector.js';
+ * import GeoJSON from 'ol/format/GeoJSON.js';
+ * import {bbox} from 'ol/loadingstrategy.js';
  *
  * const vectorSource = new Vector({
  *   format: new GeoJSON(),
@@ -500,26 +500,26 @@ class VectorSource extends Source {
       /**
        * @param {import("../Collection.js").CollectionEvent<import("../Feature.js").default<Geometry>>} evt The collection event
        */
-      function (evt) {
+      (evt) => {
         if (!modifyingCollection) {
           modifyingCollection = true;
           this.addFeature(evt.element);
           modifyingCollection = false;
         }
-      }.bind(this)
+      }
     );
     collection.addEventListener(
       CollectionEventType.REMOVE,
       /**
        * @param {import("../Collection.js").CollectionEvent<import("../Feature.js").default<Geometry>>} evt The collection event
        */
-      function (evt) {
+      (evt) => {
         if (!modifyingCollection) {
           modifyingCollection = true;
           this.removeFeature(evt.element);
           modifyingCollection = false;
         }
-      }.bind(this)
+      }
     );
     this.featuresCollection_ = collection;
   }
@@ -542,9 +542,9 @@ class VectorSource extends Source {
       }
     } else {
       if (this.featuresRtree_) {
-        const removeAndIgnoreReturn = function (feature) {
+        const removeAndIgnoreReturn = (feature) => {
           this.removeFeatureInternal(feature);
-        }.bind(this);
+        };
         this.featuresRtree_.forEach(removeAndIgnoreReturn);
         for (const id in this.nullGeometryFeatures_) {
           this.removeFeatureInternal(this.nullGeometryFeatures_[id]);
@@ -980,7 +980,7 @@ class VectorSource extends Source {
           extentToLoad,
           resolution,
           projection,
-          function (features) {
+          (features) => {
             --this.loadingExtentsCount_;
             this.dispatchEvent(
               new VectorSourceEvent(
@@ -989,13 +989,13 @@ class VectorSource extends Source {
                 features
               )
             );
-          }.bind(this),
-          function () {
+          },
+          () => {
             --this.loadingExtentsCount_;
             this.dispatchEvent(
               new VectorSourceEvent(VectorEventType.FEATURESLOADERROR)
             );
-          }.bind(this)
+          }
         );
         loadedExtentsRtree.insert(extentToLoad, {extent: extentToLoad.slice()});
       }

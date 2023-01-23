@@ -146,14 +146,22 @@ class ImageSource extends Source {
   }
 
   /**
+   * @param {Array<number>|null} resolutions Resolutions.
+   */
+  setResolutions(resolutions) {
+    this.resolutions_ = resolutions;
+  }
+
+  /**
    * @protected
    * @param {number} resolution Resolution.
    * @return {number} Resolution.
    */
   findNearestResolution(resolution) {
-    if (this.resolutions_) {
-      const idx = linearFindNearest(this.resolutions_, resolution, 0);
-      resolution = this.resolutions_[idx];
+    const resolutions = this.getResolutions();
+    if (resolutions) {
+      const idx = linearFindNearest(resolutions, resolution, 0);
+      resolution = resolutions[idx];
     }
     return resolution;
   }
@@ -196,14 +204,8 @@ class ImageSource extends Source {
       extent,
       resolution,
       pixelRatio,
-      function (extent, resolution, pixelRatio) {
-        return this.getImageInternal(
-          extent,
-          resolution,
-          pixelRatio,
-          sourceProjection
-        );
-      }.bind(this),
+      (extent, resolution, pixelRatio) =>
+        this.getImageInternal(extent, resolution, pixelRatio, sourceProjection),
       this.getInterpolate()
     );
     this.reprojectedRevision_ = this.getRevision();
