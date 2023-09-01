@@ -4,7 +4,13 @@ const path = require('path');
 
 module.exports = function (karma) {
   karma.set({
-    browsers: ['ChromeHeadless'],
+    browsers: ['ChromeHeadlessLauncher'],
+    customLaunchers: {
+      ChromeHeadlessLauncher: {
+        base: 'Chrome',
+        flags: ['--headless=new'],
+      },
+    },
     browserDisconnectTolerance: 2,
     frameworks: ['webpack', 'mocha', 'source-map-support'],
     client: {
@@ -54,6 +60,9 @@ module.exports = function (karma) {
     ],
     proxies: {
       '/spec/': '/base/spec/',
+      '/wms': '/base/spec/ol/data/blank.png',
+      '/ImageServer/exportImage': '/base/spec/ol/data/blank.png',
+      '/MapServer/export': '/base/spec/ol/data/blank.png',
     },
     preprocessors: {
       '**/*.js': ['webpack'], //, 'sourcemap'],

@@ -70,6 +70,7 @@ export class VectorSourceEvent extends Event {
  */
 
 /**
+ * @template {import("../geom/Geometry.js").default} [Geometry=import("../geom/Geometry.js").default]
  * @typedef {Object} Options
  * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
  * @property {Array<import("../Feature.js").default<Geometry>>|Collection<import("../Feature.js").default<Geometry>>} [features]
@@ -159,7 +160,6 @@ export class VectorSourceEvent extends Event {
  * @property {boolean} [wrapX=true] Wrap the world horizontally. For vector editing across the
  * -180° and 180° meridians to work properly, this should be set to `false`. The
  * resulting geometry coordinates will then exceed the world bounds.
- * @template {import("../geom/Geometry.js").default} [Geometry=import("../geom/Geometry.js").default]
  */
 
 /**
@@ -229,7 +229,7 @@ class VectorSource extends Source {
     if (options.loader !== undefined) {
       this.loader_ = options.loader;
     } else if (this.url_ !== undefined) {
-      assert(this.format_, 7); // `format` must be set when `url` is set
+      assert(this.format_, '`format` must be set when `url` is set');
       // create a XHR feature loader for "url" and "format"
       this.loader_ = xhr(
         this.url_,
@@ -402,7 +402,10 @@ class VectorSource extends Source {
       }
     }
     if (valid) {
-      assert(!(featureKey in this.uidIndex_), 30); // The passed `feature` was already added to the source
+      assert(
+        !(featureKey in this.uidIndex_),
+        'The passed `feature` was already added to the source'
+      );
       this.uidIndex_[featureKey] = feature;
     }
     return valid;
@@ -580,7 +583,8 @@ class VectorSource extends Source {
   forEachFeature(callback) {
     if (this.featuresRtree_) {
       return this.featuresRtree_.forEach(callback);
-    } else if (this.featuresCollection_) {
+    }
+    if (this.featuresCollection_) {
       this.featuresCollection_.forEach(callback);
     }
   }
@@ -630,7 +634,8 @@ class VectorSource extends Source {
   forEachFeatureInExtent(extent, callback) {
     if (this.featuresRtree_) {
       return this.featuresRtree_.forEachInExtent(extent, callback);
-    } else if (this.featuresCollection_) {
+    }
+    if (this.featuresCollection_) {
       this.featuresCollection_.forEach(callback);
     }
   }
@@ -742,7 +747,8 @@ class VectorSource extends Source {
       return [].concat(
         ...extents.map((anExtent) => this.featuresRtree_.getInExtent(anExtent))
       );
-    } else if (this.featuresCollection_) {
+    }
+    if (this.featuresCollection_) {
       return this.featuresCollection_.getArray().slice(0);
     }
     return [];
@@ -1115,7 +1121,7 @@ class VectorSource extends Source {
    * @api
    */
   setUrl(url) {
-    assert(this.format_, 7); // `format` must be set when `url` is set
+    assert(this.format_, '`format` must be set when `url` is set');
     this.url_ = url;
     this.setLoader(xhr(url, this.format_));
   }

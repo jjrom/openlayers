@@ -368,10 +368,12 @@ class WFS extends XMLFeature {
   readTransactionResponse(source) {
     if (!source) {
       return undefined;
-    } else if (typeof source === 'string') {
+    }
+    if (typeof source === 'string') {
       const doc = parse(source);
       return this.readTransactionResponseFromDocument(doc);
-    } else if (isDocument(source)) {
+    }
+    if (isDocument(source)) {
       return this.readTransactionResponseFromDocument(
         /** @type {Document} */ (source)
       );
@@ -392,10 +394,12 @@ class WFS extends XMLFeature {
   readFeatureCollectionMetadata(source) {
     if (!source) {
       return undefined;
-    } else if (typeof source === 'string') {
+    }
+    if (typeof source === 'string') {
       const doc = parse(source);
       return this.readFeatureCollectionMetadataFromDocument(doc);
-    } else if (isDocument(source)) {
+    }
+    if (isDocument(source)) {
       return this.readFeatureCollectionMetadataFromDocument(
         /** @type {Document} */ (source)
       );
@@ -515,11 +519,17 @@ class WFS extends XMLFeature {
       'featurePrefix': options.featurePrefix,
       'propertyNames': options.propertyNames ? options.propertyNames : [],
     });
-    assert(Array.isArray(options.featureTypes), 11); // `options.featureTypes` must be an Array
+    assert(
+      Array.isArray(options.featureTypes),
+      '`options.featureTypes` must be an Array'
+    );
     if (typeof options.featureTypes[0] === 'string') {
       let filter = options.filter;
       if (options.bbox) {
-        assert(options.geometryName, 12); // `options.geometryName` must also be provided when `options.bbox` is set
+        assert(
+          options.geometryName,
+          '`options.geometryName` must also be provided when `options.bbox` is set'
+        );
         filter = this.combineBboxAndFilter(
           options.geometryName,
           options.bbox,
@@ -830,7 +840,7 @@ function getTypeName(featurePrefix, featureType) {
  */
 function writeDelete(node, feature, objectStack) {
   const context = objectStack[objectStack.length - 1];
-  assert(feature.getId() !== undefined, 26); // Features must have an id set
+  assert(feature.getId() !== undefined, 'Features must have an id set');
   const featureType = context['featureType'];
   const featurePrefix = context['featurePrefix'];
   const featureNS = context['featureNS'];
@@ -850,7 +860,7 @@ function writeDelete(node, feature, objectStack) {
  */
 function writeUpdate(node, feature, objectStack) {
   const context = objectStack[objectStack.length - 1];
-  assert(feature.getId() !== undefined, 27); // Features must have an id set
+  assert(feature.getId() !== undefined, 'Features must have an id set');
   const version = context['version'];
   const featureType = context['featureType'];
   const featurePrefix = context['featurePrefix'];

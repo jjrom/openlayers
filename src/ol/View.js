@@ -202,7 +202,7 @@ import {fromExtent as polygonFromExtent} from './geom/Polygon.js';
 
 /**
  * @typedef {Object} State
- * @property {import("./coordinate.js").Coordinate} center Center.
+ * @property {import("./coordinate.js").Coordinate} center Center (in view projection coordinates).
  * @property {import("./proj/Projection.js").default} projection Projection.
  * @property {number} resolution Resolution.
  * @property {import("./coordinate.js").Coordinate} [nextCenter] The next center during an animation series.
@@ -210,6 +210,14 @@ import {fromExtent as polygonFromExtent} from './geom/Polygon.js';
  * @property {number} [nextRotation] The next rotation during an animation series.
  * @property {number} rotation Rotation.
  * @property {number} zoom Zoom.
+ */
+
+/**
+ * Like {@link import("./Map.js").FrameState}, but just `viewState` and `extent`.
+ * @typedef {Object} ViewStateLayerStateExtent
+ * @property {State} viewState View state.
+ * @property {import("./extent.js").Extent} extent Extent (in user projection coordinates).
+ * @property {Array<import("./layer/Layer.js").State>} [layerStatesArray] Layer states.
  */
 
 /**
@@ -500,7 +508,7 @@ class View extends BaseObject {
   set padding(padding) {
     let oldPadding = this.padding_;
     this.padding_ = padding;
-    const center = this.getCenter();
+    const center = this.getCenterInternal();
     if (center) {
       const newPadding = padding || [0, 0, 0, 0];
       oldPadding = oldPadding || [0, 0, 0, 0];
@@ -1002,11 +1010,11 @@ class View extends BaseObject {
     const center = /** @type {!import("./coordinate.js").Coordinate} */ (
       this.getCenterInternal()
     );
-    assert(center, 1); // The view center is not defined
+    assert(center, 'The view center is not defined');
     const resolution = /** @type {!number} */ (this.getResolution());
-    assert(resolution !== undefined, 2); // The view resolution is not defined
+    assert(resolution !== undefined, 'The view resolution is not defined');
     const rotation = /** @type {!number} */ (this.getRotation());
-    assert(rotation !== undefined, 3); // The view rotation is not defined
+    assert(rotation !== undefined, 'The view rotation is not defined');
 
     return getForViewAndSize(center, resolution, rotation, size);
   }
@@ -1244,6 +1252,16 @@ class View extends BaseObject {
   }
 
   /**
+   * @return {ViewStateLayerStateExtent} Like `FrameState`, but just `viewState` and `extent`.
+   */
+  getViewStateAndExtent() {
+    return {
+      viewState: this.getState(),
+      extent: this.calculateExtent(),
+    };
+  }
+
+  /**
    * Get the current zoom level. This method may return non-integer zoom levels
    * if the view does not constrain the resolution, or if an interaction or
    * animation is underway.
@@ -1329,10 +1347,13 @@ class View extends BaseObject {
       Array.isArray(geometryOrExtent) ||
         typeof (/** @type {?} */ (geometryOrExtent).getSimplifiedGeometry) ===
           'function',
-      24
-    ); // Invalid extent or geometry provided as `geometry`
+      'Invalid extent or geometry provided as `geometry`'
+    );
     if (Array.isArray(geometryOrExtent)) {
-      assert(!isEmpty(geometryOrExtent), 25); // Cannot fit empty extent provided as `geometry`
+      assert(
+        !isEmpty(geometryOrExtent),
+        'Cannot fit empty extent provided as `geometry`'
+      );
       const extent = fromUserExtent(geometryOrExtent, this.getProjection());
       geometry = polygonFromExtent(extent);
     } else if (geometryOrExtent.getType() === 'Circle') {
@@ -1837,8 +1858,10 @@ class View extends BaseObject {
    * @param {import("./coordinate.js").Coordinate} [anchor] The origin of the transformation.
    */
   endInteractionInternal(duration, resolutionDirection, anchor) {
+    if (!this.getInteracting()) {
+      return;
+    }
     this.setHint(ViewHint.INTERACTING, -1);
-
     this.resolveConstraints(duration, resolutionDirection, anchor);
   }
 
@@ -2076,9 +2099,11 @@ export function createRotationConstraint(options) {
     const constrainRotation = options.constrainRotation;
     if (constrainRotation === undefined || constrainRotation === true) {
       return createSnapToZero();
-    } else if (constrainRotation === false) {
+    }
+    if (constrainRotation === false) {
       return rotationNone;
-    } else if (typeof constrainRotation === 'number') {
+    }
+    if (typeof constrainRotation === 'number') {
       return createSnapToN(constrainRotation);
     }
     return rotationNone;

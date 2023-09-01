@@ -35,7 +35,6 @@ export const BufferUsage = {
  * Note:
  * See the documentation of [WebGLRenderingContext.bufferData](https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/bufferData)
  * for more info on buffer usage.
- * @api
  */
 class WebGLArrayBuffer {
   /**
@@ -56,7 +55,10 @@ class WebGLArrayBuffer {
      */
     this.type = type;
 
-    assert(type === ARRAY_BUFFER || type === ELEMENT_ARRAY_BUFFER, 62);
+    assert(
+      type === ARRAY_BUFFER || type === ELEMENT_ARRAY_BUFFER,
+      'A `WebGLArrayBuffer` must either be of type `ELEMENT_ARRAY_BUFFER` or `ARRAY_BUFFER`'
+    );
 
     /**
      * @private
@@ -68,26 +70,32 @@ class WebGLArrayBuffer {
   /**
    * Populates the buffer with an array of the given size (all values will be zeroes).
    * @param {number} size Array size
+   * @return {WebGLArrayBuffer} This
    */
   ofSize(size) {
     this.array = new (getArrayClassForType(this.type))(size);
+    return this;
   }
 
   /**
    * Populates the buffer with an array of the given size.
    * @param {Array<number>} array Numerical array
+   * @return {WebGLArrayBuffer} This
    */
   fromArray(array) {
     this.array = getArrayClassForType(this.type).from(array);
+    return this;
   }
 
   /**
    * Populates the buffer with a raw binary array buffer.
    * @param {ArrayBuffer} buffer Raw binary buffer to populate the array with. Note that this buffer must have been
    * initialized for the same typed array class.
+   * @return {WebGLArrayBuffer} This
    */
   fromArrayBuffer(buffer) {
     this.array = new (getArrayClassForType(this.type))(buffer);
+    return this;
   }
 
   /**

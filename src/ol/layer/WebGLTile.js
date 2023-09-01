@@ -124,6 +124,7 @@ function parseStyle(style, bandCount) {
     stringLiteralsMap: {},
     functions: {},
     bandCount: bandCount,
+    style: style,
   };
 
   const pipeline = [];
@@ -202,13 +203,13 @@ function parseStyle(style, bandCount) {
   }
 
   for (let i = 0; i < numVariables; ++i) {
-    const variableName = context.variables[i];
-    if (!(variableName in style.variables)) {
-      throw new Error(`Missing '${variableName}' in style variables`);
+    const variable = context.variables[i];
+    if (!(variable.name in style.variables)) {
+      throw new Error(`Missing '${variable.name}' in style variables`);
     }
-    const uniformName = uniformNameForVariable(variableName);
+    const uniformName = uniformNameForVariable(variable.name);
     uniforms[uniformName] = function () {
-      let value = style.variables[variableName];
+      let value = style.variables[variable.name];
       if (typeof value === 'string') {
         value = getStringNumberEquivalent(context, value);
       }
@@ -272,10 +273,6 @@ function parseStyle(style, bandCount) {
       }[0],  v_textureCoord);
 
       ${pipeline.join('\n')}
-
-      if (color.a == 0.0) {
-        discard;
-      }
 
       gl_FragColor = color;
       gl_FragColor.rgb *= gl_FragColor.a;
@@ -502,7 +499,6 @@ class WebGLTileLayer extends BaseTileLayer {
       vertexShader: parsedStyle.vertexShader,
       fragmentShader: parsedStyle.fragmentShader,
       uniforms: parsedStyle.uniforms,
-      paletteTextures: parsedStyle.paletteTextures,
     });
     this.changed();
   }

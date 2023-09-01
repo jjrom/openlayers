@@ -54,7 +54,7 @@ import {warn} from './console.js';
  * @property {boolean} animate Animate.
  * @property {import("./transform.js").Transform} coordinateToPixelTransform CoordinateToPixelTransform.
  * @property {import("rbush").default} declutterTree DeclutterTree.
- * @property {null|import("./extent.js").Extent} extent Extent.
+ * @property {null|import("./extent.js").Extent} extent Extent (in view projection coordinates).
  * @property {import("./extent.js").Extent} [nextExtent] Next extent during an animation series.
  * @property {number} index Index.
  * @property {Array<import("./layer/Layer.js").State>} layerStatesArray LayerStatesArray.
@@ -294,7 +294,7 @@ class Map extends BaseObject {
 
     /**
      * @private
-     * @type {*}
+     * @type {ReturnType<typeof setTimeout>}
      */
     this.postRenderTimeoutHandle_;
 
@@ -1259,6 +1259,7 @@ class Map extends BaseObject {
       if (rootNode instanceof ShadowRoot) {
         this.resizeObserver_.unobserve(rootNode.host);
       }
+      this.setSize(undefined);
     }
 
     // target may be undefined, null, a string or an Element.
@@ -1454,6 +1455,21 @@ class Map extends BaseObject {
     if (this.renderer_ && this.animationDelayKey_ === undefined) {
       this.animationDelayKey_ = requestAnimationFrame(this.animationDelay_);
     }
+  }
+
+  /**
+   * This method is meant to be called in a layer's `prerender` listener. It causes all collected
+   * declutter items to be decluttered and rendered on the map immediately. This is useful for
+   * layers that need to appear entirely above the decluttered items of layers lower in the layer
+   * stack.
+   * @api
+   */
+  flushDeclutterItems() {
+    const frameState = this.frameState_;
+    if (!frameState) {
+      return;
+    }
+    this.renderer_.flushDeclutterItems(frameState);
   }
 
   /**
@@ -1792,8 +1808,8 @@ function createOptionsInternal(options) {
     } else {
       assert(
         typeof (/** @type {?} */ (options.controls).getArray) === 'function',
-        47
-      ); // Expected `controls` to be an array or an `import("./Collection.js").Collection`
+        'Expected `controls` to be an array or an `ol/Collection.js`'
+      );
       controls = options.controls;
     }
   }
@@ -1807,8 +1823,8 @@ function createOptionsInternal(options) {
       assert(
         typeof (/** @type {?} */ (options.interactions).getArray) ===
           'function',
-        48
-      ); // Expected `interactions` to be an array or an `import("./Collection.js").Collection`
+        'Expected `interactions` to be an array or an `ol/Collection.js`'
+      );
       interactions = options.interactions;
     }
   }
@@ -1821,8 +1837,8 @@ function createOptionsInternal(options) {
     } else {
       assert(
         typeof (/** @type {?} */ (options.overlays).getArray) === 'function',
-        49
-      ); // Expected `overlays` to be an array or an `import("./Collection.js").Collection`
+        'Expected `overlays` to be an array or an `ol/Collection.js`'
+      );
       overlays = options.overlays;
     }
   } else {

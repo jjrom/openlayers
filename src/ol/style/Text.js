@@ -35,8 +35,8 @@ const DEFAULT_FILL_COLOR = '#333';
  * @property {boolean} [overflow=false] For polygon labels or when `placement` is set to `'line'`, allow text to exceed
  * the width of the polygon at the label position or the length of the path that it follows.
  * @property {TextPlacement} [placement='point'] Text placement.
- * @property {number} [repeat] Repeat interval in pixels. When set, the text will be repeated at this interval. Only available
- * when `placement` is set to `'line'`. Overrides 'textAlign'.
+ * @property {number} [repeat] Repeat interval. When set, the text will be repeated at this interval, which specifies
+ * the distance between two text anchors in pixels. Only available when `placement` is set to `'line'`. Overrides 'textAlign'.
  * @property {number|import("../size.js").Size} [scale] Scale.
  * @property {boolean} [rotateWithView=false] Whether to rotate the text with the view.
  * @property {number} [rotation=0] Rotation in radians (positive rotation clockwise).
@@ -44,7 +44,7 @@ const DEFAULT_FILL_COLOR = '#333';
  * contain line breaks (`\n`). For rich text provide an array of text/font tuples. A tuple consists of the text to
  * render and the font to use (or `''` to use the text style's font). A line break has to be a separate tuple (i.e. `'\n', ''`).
  * **Example:** `['foo', 'bold 10px sans-serif', ' bar', 'italic 10px sans-serif', ' baz', '']` will yield "**foo** *bar* baz".
- * **Note:** Rich text is not supported for the immediate rendering API.
+ * **Note:** Rich text is not supported for `placement: 'line'` or the immediate rendering API.
  * @property {CanvasTextAlign} [textAlign] Text alignment. Possible values: `'left'`, `'right'`, `'center'`, `'end'` or `'start'`.
  * Default is `'center'` for `placement: 'point'`. For `placement: 'line'`, the default is to let the renderer choose a
  * placement where `maxAngle` is not exceeded.
@@ -54,7 +54,7 @@ const DEFAULT_FILL_COLOR = '#333';
  * **Note:** `justify` is ignored for immediate rendering and also for `placement: 'line'`.
  * @property {CanvasTextBaseline} [textBaseline='middle'] Text base line. Possible values: `'bottom'`, `'top'`, `'middle'`, `'alphabetic'`,
  * `'hanging'`, `'ideographic'`.
- * @property {import("./Fill.js").default} [fill] Fill style. If none is provided, we'll use a dark fill-style (#333).
+ * @property {import("./Fill.js").default|null} [fill] Fill style. If none is provided, we'll use a dark fill-style (#333). Specify `null` for no fill.
  * @property {import("./Stroke.js").default} [stroke] Stroke style.
  * @property {import("./Fill.js").default} [backgroundFill] Fill style for the text background when `placement` is
  * `'point'`. Default is no fill.
