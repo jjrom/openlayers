@@ -41,6 +41,7 @@ export const ShaderType = {
  */
 export const DefaultUniform = {
   PROJECTION_MATRIX: 'u_projectionMatrix',
+  SCREEN_TO_WORLD_MATRIX: 'u_screenToWorldMatrix',
   TIME: 'u_time',
   ZOOM: 'u_zoom',
   RESOLUTION: 'u_resolution',
@@ -355,6 +356,12 @@ class WebGLHelper extends Disposable {
      * @type {WebGLProgram}
      */
     this.currentProgram_ = null;
+
+    /**
+     * @private
+     * @type boolean
+     */
+    this.needsToBeRecreated_ = false;
 
     const canvas = this.gl_.canvas;
 
@@ -1046,18 +1053,31 @@ class WebGLHelper extends Disposable {
 
   /**
    * WebGL context was lost
+   * @param {WebGLContextEvent} event The context loss event.
    * @private
    */
-  handleWebGLContextLost() {
+  handleWebGLContextLost(event) {
     clear(this.bufferCache_);
     this.currentProgram_ = null;
+
+    event.preventDefault();
   }
 
   /**
    * WebGL context was restored
    * @private
    */
-  handleWebGLContextRestored() {}
+  handleWebGLContextRestored() {
+    this.needsToBeRecreated_ = true;
+  }
+
+  /**
+   * Returns whether this helper needs to be recreated, as the context was lost and then restored.
+   * @return {boolean} Whether this helper needs to be recreated.
+   */
+  needsToBeRecreated() {
+    return this.needsToBeRecreated_;
+  }
 
   /**
    * Will create or reuse a given webgl texture and apply the given size. If no image data
