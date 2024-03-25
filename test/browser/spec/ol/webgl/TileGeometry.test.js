@@ -42,7 +42,7 @@ describe('ol/webgl/TileGeometry', function () {
         }),
         helper,
       },
-      styleRenderers
+      styleRenderers,
     );
   });
   this.afterEach(() => {
@@ -81,7 +81,7 @@ describe('ol/webgl/TileGeometry', function () {
         TileState.LOADED,
         'http://source',
         null,
-        VOID
+        VOID,
       );
       sourceTile.extent = [-100, -200, 300, 400];
       sourceTile.setFeatures(features);
@@ -89,7 +89,7 @@ describe('ol/webgl/TileGeometry', function () {
         [3, 2, 1],
         TileState.LOADED,
         [3, 2, 1],
-        () => [sourceTile]
+        () => [sourceTile],
       );
 
       sinon.spy(tileGeometry.batch_, 'clear');
@@ -108,11 +108,11 @@ describe('ol/webgl/TileGeometry', function () {
       const originTransform = [1, 0, 0, 1, 100, 200];
       expect(styleRenderers[0].generateBuffers.callCount).to.be(1);
       expect(styleRenderers[0].generateBuffers.getCall(0).args[1]).to.eql(
-        originTransform
+        originTransform,
       );
       expect(styleRenderers[1].generateBuffers.callCount).to.be(1);
       expect(styleRenderers[1].generateBuffers.getCall(0).args[1]).to.eql(
-        originTransform
+        originTransform,
       );
     });
     it('becomes ready when each of the renderers have finished generating buffers', async () => {
@@ -122,6 +122,11 @@ describe('ol/webgl/TileGeometry', function () {
       styleRenderers[1].endGenerate_();
       await new Promise((resolve) => setTimeout(resolve));
       expect(tileGeometry.ready).to.be(true);
+    });
+    it('fills the mask buffer with the tile extent', () => {
+      expect(tileGeometry.maskVertices.getArray()).to.eql([
+        -100, -200, 300, -200, 300, 400, -100, 400,
+      ]);
     });
   });
 });

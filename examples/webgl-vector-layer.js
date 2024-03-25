@@ -7,10 +7,10 @@ import VectorSource from '../src/ol/source/Vector.js';
 import View from '../src/ol/View.js';
 import WebGLVectorLayerRenderer from '../src/ol/renderer/webgl/VectorLayer.js';
 
-/** @type {import('../src/ol/style/literal.js').LiteralStyle} */
+/** @type {import('../src/ol/style/webgl.js').WebGLStyle} */
 const style = {
   'stroke-color': ['*', ['get', 'COLOR'], [220, 220, 220]],
-  'stroke-width': 3,
+  'stroke-width': 2,
   'stroke-offset': -1,
   'fill-color': ['*', ['get', 'COLOR'], [255, 255, 255, 0.6]],
 };
@@ -41,4 +41,49 @@ const map = new Map({
     center: [0, 0],
     zoom: 1,
   }),
+});
+
+const featureOverlay = new WebGLLayer({
+  source: new VectorSource(),
+  map: map,
+  style: {
+    'stroke-color': 'rgba(255, 255, 255, 0.7)',
+    'stroke-width': 1,
+  },
+});
+
+let highlight;
+const displayFeatureInfo = function (pixel) {
+  const feature = map.forEachFeatureAtPixel(pixel, function (feature) {
+    return feature;
+  });
+
+  const info = document.getElementById('info');
+  if (feature) {
+    info.innerHTML = feature.get('ECO_NAME') || '&nbsp;';
+  } else {
+    info.innerHTML = '&nbsp;';
+  }
+
+  if (feature !== highlight) {
+    if (highlight) {
+      featureOverlay.getSource().removeFeature(highlight);
+    }
+    if (feature) {
+      featureOverlay.getSource().addFeature(feature);
+    }
+    highlight = feature;
+  }
+};
+
+map.on('pointermove', function (evt) {
+  if (evt.dragging) {
+    return;
+  }
+  const pixel = map.getEventPixel(evt.originalEvent);
+  displayFeatureInfo(pixel);
+});
+
+map.on('click', function (evt) {
+  displayFeatureInfo(evt.pixel);
 });

@@ -2,7 +2,7 @@ import CircleStyle from '../../../../../src/ol/style/Circle.js';
 import Fill from '../../../../../src/ol/style/Fill.js';
 import Stroke from '../../../../../src/ol/style/Stroke.js';
 
-describe('ol.style.Circle', function () {
+describe('ol/style/Circle', function () {
   describe('#constructor', function () {
     it('creates a canvas (no fill-style)', function () {
       const style = new CircleStyle({radius: 10});
@@ -83,7 +83,7 @@ describe('ol.style.Circle', function () {
       expect(original.getScale()[0]).to.eql(clone.getScale()[0]);
       expect(original.getScale()[1]).to.eql(clone.getScale()[1]);
       expect(original.getStroke().getColor()).to.eql(
-        clone.getStroke().getColor()
+        clone.getStroke().getColor(),
       );
       expect(original.getDisplacement()[0]).to.eql(clone.getDisplacement()[0]);
       expect(original.getDisplacement()[1]).to.eql(clone.getDisplacement()[1]);
@@ -109,10 +109,10 @@ describe('ol.style.Circle', function () {
       clone.getFill().setColor('#012345');
       clone.getStroke().setColor('#012345');
       expect(original.getFill().getColor()).to.not.eql(
-        clone.getFill().getColor()
+        clone.getFill().getColor(),
       );
       expect(original.getStroke().getColor()).to.not.eql(
-        clone.getStroke().getColor()
+        clone.getStroke().getColor(),
       );
     });
   });
@@ -126,8 +126,17 @@ describe('ol.style.Circle', function () {
         }),
       });
       expect(style.getRadius()).to.eql(10);
+
+      const hitImageBefore = style.getHitDetectionImage();
+      expect(hitImageBefore).to.be.an(HTMLCanvasElement);
+      expect(hitImageBefore.width).to.eql(20);
+
       style.setRadius(20);
       expect(style.getRadius()).to.eql(20);
+
+      const hitImageAfter = style.getHitDetectionImage();
+      expect(hitImageAfter).to.be.an(HTMLCanvasElement);
+      expect(hitImageAfter.width).to.eql(40);
     });
   });
 });

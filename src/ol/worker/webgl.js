@@ -43,7 +43,7 @@ worker.onmessage = (event) => {
           vertexBuffer,
           indexBuffer,
           customAttrsCount,
-          bufferPositions
+          bufferPositions,
         );
       }
 
@@ -54,7 +54,7 @@ worker.onmessage = (event) => {
           indexBuffer: indexBuffer.buffer,
           renderInstructions: renderInstructions.buffer,
         },
-        received
+        received,
       );
 
       worker.postMessage(message, [
@@ -65,7 +65,9 @@ worker.onmessage = (event) => {
       break;
     }
     case WebGLWorkerMessageType.GENERATE_LINE_STRING_BUFFERS: {
+      /** @type {Array<number>} */
       const vertices = [];
+      /** @type {Array<number>} */
       const indices = [];
 
       const customAttrsCount = received.customAttributesSize;
@@ -83,8 +85,8 @@ worker.onmessage = (event) => {
         customAttributes = Array.from(
           renderInstructions.slice(
             currentInstructionsIndex,
-            currentInstructionsIndex + customAttrsCount
-          )
+            currentInstructionsIndex + customAttrsCount,
+          ),
         );
         currentInstructionsIndex += customAttrsCount;
         verticesCount = renderInstructions[currentInstructionsIndex++];
@@ -100,6 +102,7 @@ worker.onmessage = (event) => {
             renderInstructions[lastInstructionsIndex + 1];
 
         let currentLength = 0;
+        let currentAngleTangentSum = 0;
 
         // last point is only a segment end, do not loop over it
         for (let i = 0; i < verticesCount - 1; i++) {
@@ -117,7 +120,7 @@ worker.onmessage = (event) => {
           } else if (isLoop) {
             afterIndex = firstInstructionsIndex + instructionsPerVertex;
           }
-          currentLength = writeLineSegmentToBuffers(
+          const measures = writeLineSegmentToBuffers(
             renderInstructions,
             currentInstructionsIndex + i * instructionsPerVertex,
             currentInstructionsIndex + (i + 1) * instructionsPerVertex,
@@ -127,8 +130,11 @@ worker.onmessage = (event) => {
             indices,
             customAttributes,
             invertTransform,
-            currentLength
+            currentLength,
+            currentAngleTangentSum,
           );
+          currentLength = measures.length;
+          currentAngleTangentSum = measures.angle;
         }
         currentInstructionsIndex += verticesCount * instructionsPerVertex;
       }
@@ -143,7 +149,7 @@ worker.onmessage = (event) => {
           indexBuffer: indexBuffer.buffer,
           renderInstructions: renderInstructions.buffer,
         },
-        received
+        received,
       );
 
       worker.postMessage(message, [
@@ -154,7 +160,9 @@ worker.onmessage = (event) => {
       break;
     }
     case WebGLWorkerMessageType.GENERATE_POLYGON_BUFFERS: {
+      /** @type {Array<number>} */
       const vertices = [];
+      /** @type {Array<number>} */
       const indices = [];
 
       const customAttrsCount = received.customAttributesSize;
@@ -167,7 +175,7 @@ worker.onmessage = (event) => {
           currentInstructionsIndex,
           vertices,
           indices,
-          customAttrsCount
+          customAttrsCount,
         );
       }
 
@@ -181,7 +189,7 @@ worker.onmessage = (event) => {
           indexBuffer: indexBuffer.buffer,
           renderInstructions: renderInstructions.buffer,
         },
-        received
+        received,
       );
 
       worker.postMessage(message, [

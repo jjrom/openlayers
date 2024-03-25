@@ -1,10 +1,13 @@
-import {ShaderBuilder} from '../../../../../src/ol/webgl/ShaderBuilder.js';
+import {
+  COMMON_HEADER,
+  ShaderBuilder,
+} from '../../../../../src/ol/webgl/ShaderBuilder.js';
 import {
   arrayToGlsl,
   colorToGlsl,
   numberToGlsl,
   stringToGlsl,
-} from '../../../../../src/ol/style/expressions.js';
+} from '../../../../../src/ol/expr/gpu.js';
 
 describe('ol.webgl.ShaderBuilder', () => {
   describe('getSymbolVertexShader', () => {
@@ -17,35 +20,15 @@ describe('ol.webgl.ShaderBuilder', () => {
       builder.setSymbolColorExpression(colorToGlsl([80, 0, 255, 1]));
       builder.setTextureCoordinateExpression(arrayToGlsl([0, 0.5, 0.5, 1]));
 
-      expect(builder.getSymbolVertexShader()).to
-        .eql(`#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-uniform mat4 u_projectionMatrix;
-uniform mat4 u_screenToWorldMatrix;
-uniform vec2 u_viewportSizePx;
-uniform float u_pixelRatio;
-uniform float u_globalAlpha;
-uniform float u_time;
-uniform float u_zoom;
-uniform float u_resolution;
-uniform float u_rotation;
-uniform vec4 u_renderExtent;
-uniform mediump int u_hitDetection;
-
-const float PI = 3.141592653589793238;
-const float TWO_PI = 2.0 * PI;
-
+      expect(builder.getSymbolVertexShader()).to.eql(`${COMMON_HEADER}
 
 attribute vec2 a_position;
 attribute float a_index;
-attribute vec4 a_hitColor;
+attribute vec4 a_prop_hitColor;
 
 varying vec2 v_texCoord;
 varying vec2 v_quadCoord;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying vec2 v_centerPx;
 varying float v_angle;
 varying vec2 v_quadSizePx;
@@ -54,7 +37,6 @@ varying vec3 v_test;
 
 vec2 pxToScreen(vec2 coordPx) {
   vec2 scaled = coordPx / u_viewportSizePx / 0.5;
-  
   return scaled;
 }
 
@@ -77,18 +59,18 @@ void main(void) {
     offsetPx += halfSizePx * vec2(-1., 1.);
   }
   float angle = 0.0;
+  
   float c = cos(-angle);
   float s = sin(-angle);
   offsetPx = vec2(c * offsetPx.x - s * offsetPx.y, s * offsetPx.x + c * offsetPx.y);
   vec4 center = u_projectionMatrix * vec4(a_position, 0.0, 1.0);
-  gl_Position = center + vec4(pxToScreen(offsetPx), 0., 0.);
+  gl_Position = center + vec4(pxToScreen(offsetPx), u_depth, 0.);
   vec4 texCoord = vec4(0.0, 0.5, 0.5, 1.0);
   float u = a_index == 0.0 || a_index == 3.0 ? texCoord.s : texCoord.p;
   float v = a_index == 2.0 || a_index == 3.0 ? texCoord.t : texCoord.q;
   v_texCoord = vec2(u, v);
-  v_hitColor = a_hitColor;
+  v_prop_hitColor = a_prop_hitColor;
   v_angle = angle;
-  
   c = cos(-v_angle);
   s = sin(-v_angle);
   centerOffsetPx = vec2(c * centerOffsetPx.x - s * centerOffsetPx.y, s * centerOffsetPx.x + c * centerOffsetPx.y); 
@@ -106,35 +88,15 @@ void main(void) {
       builder.setSymbolColorExpression(colorToGlsl([80, 0, 255, 1]));
       builder.setTextureCoordinateExpression(arrayToGlsl([0, 0.5, 0.5, 1]));
 
-      expect(builder.getSymbolVertexShader()).to
-        .eql(`#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-uniform mat4 u_projectionMatrix;
-uniform mat4 u_screenToWorldMatrix;
-uniform vec2 u_viewportSizePx;
-uniform float u_pixelRatio;
-uniform float u_globalAlpha;
-uniform float u_time;
-uniform float u_zoom;
-uniform float u_resolution;
-uniform float u_rotation;
-uniform vec4 u_renderExtent;
-uniform mediump int u_hitDetection;
-
-const float PI = 3.141592653589793238;
-const float TWO_PI = 2.0 * PI;
-
+      expect(builder.getSymbolVertexShader()).to.eql(`${COMMON_HEADER}
 uniform float u_myUniform;
 attribute vec2 a_position;
 attribute float a_index;
-attribute vec4 a_hitColor;
+attribute vec4 a_prop_hitColor;
 attribute vec2 a_myAttr;
 varying vec2 v_texCoord;
 varying vec2 v_quadCoord;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying vec2 v_centerPx;
 varying float v_angle;
 varying vec2 v_quadSizePx;
@@ -142,7 +104,6 @@ varying vec2 v_quadSizePx;
 
 vec2 pxToScreen(vec2 coordPx) {
   vec2 scaled = coordPx / u_viewportSizePx / 0.5;
-  
   return scaled;
 }
 
@@ -165,18 +126,18 @@ void main(void) {
     offsetPx += halfSizePx * vec2(-1., 1.);
   }
   float angle = 0.0;
+  
   float c = cos(-angle);
   float s = sin(-angle);
   offsetPx = vec2(c * offsetPx.x - s * offsetPx.y, s * offsetPx.x + c * offsetPx.y);
   vec4 center = u_projectionMatrix * vec4(a_position, 0.0, 1.0);
-  gl_Position = center + vec4(pxToScreen(offsetPx), 0., 0.);
+  gl_Position = center + vec4(pxToScreen(offsetPx), u_depth, 0.);
   vec4 texCoord = vec4(0.0, 0.5, 0.5, 1.0);
   float u = a_index == 0.0 || a_index == 3.0 ? texCoord.s : texCoord.p;
   float v = a_index == 2.0 || a_index == 3.0 ? texCoord.t : texCoord.q;
   v_texCoord = vec2(u, v);
-  v_hitColor = a_hitColor;
+  v_prop_hitColor = a_prop_hitColor;
   v_angle = angle;
-  
   c = cos(-v_angle);
   s = sin(-v_angle);
   centerOffsetPx = vec2(c * centerOffsetPx.x - s * centerOffsetPx.y, s * centerOffsetPx.x + c * centerOffsetPx.y); 
@@ -192,35 +153,15 @@ void main(void) {
       builder.setTextureCoordinateExpression(arrayToGlsl([0, 0.5, 0.5, 1]));
       builder.setSymbolRotateWithView(true);
 
-      expect(builder.getSymbolVertexShader()).to
-        .eql(`#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-uniform mat4 u_projectionMatrix;
-uniform mat4 u_screenToWorldMatrix;
-uniform vec2 u_viewportSizePx;
-uniform float u_pixelRatio;
-uniform float u_globalAlpha;
-uniform float u_time;
-uniform float u_zoom;
-uniform float u_resolution;
-uniform float u_rotation;
-uniform vec4 u_renderExtent;
-uniform mediump int u_hitDetection;
-
-const float PI = 3.141592653589793238;
-const float TWO_PI = 2.0 * PI;
-
+      expect(builder.getSymbolVertexShader()).to.eql(`${COMMON_HEADER}
 
 attribute vec2 a_position;
 attribute float a_index;
-attribute vec4 a_hitColor;
+attribute vec4 a_prop_hitColor;
 
 varying vec2 v_texCoord;
 varying vec2 v_quadCoord;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying vec2 v_centerPx;
 varying float v_angle;
 varying vec2 v_quadSizePx;
@@ -228,7 +169,6 @@ varying vec2 v_quadSizePx;
 
 vec2 pxToScreen(vec2 coordPx) {
   vec2 scaled = coordPx / u_viewportSizePx / 0.5;
-  scaled = vec2(scaled.x * cos(-u_rotation) - scaled.y * sin(-u_rotation), scaled.x * sin(-u_rotation) + scaled.y * cos(-u_rotation));
   return scaled;
 }
 
@@ -251,18 +191,18 @@ void main(void) {
     offsetPx += halfSizePx * vec2(-1., 1.);
   }
   float angle = 0.0;
+  angle += u_rotation;
   float c = cos(-angle);
   float s = sin(-angle);
   offsetPx = vec2(c * offsetPx.x - s * offsetPx.y, s * offsetPx.x + c * offsetPx.y);
   vec4 center = u_projectionMatrix * vec4(a_position, 0.0, 1.0);
-  gl_Position = center + vec4(pxToScreen(offsetPx), 0., 0.);
+  gl_Position = center + vec4(pxToScreen(offsetPx), u_depth, 0.);
   vec4 texCoord = vec4(0.0, 0.5, 0.5, 1.0);
   float u = a_index == 0.0 || a_index == 3.0 ? texCoord.s : texCoord.p;
   float v = a_index == 2.0 || a_index == 3.0 ? texCoord.t : texCoord.q;
   v_texCoord = vec2(u, v);
-  v_hitColor = a_hitColor;
+  v_prop_hitColor = a_prop_hitColor;
   v_angle = angle;
-  v_angle += u_rotation;
   c = cos(-v_angle);
   s = sin(-v_angle);
   centerOffsetPx = vec2(c * centerOffsetPx.x - s * centerOffsetPx.y, s * centerOffsetPx.x + c * centerOffsetPx.y); 
@@ -277,35 +217,15 @@ void main(void) {
       builder.setSymbolOffsetExpression(arrayToGlsl([5, -7]));
       builder.setSymbolRotationExpression('u_time * 0.2');
 
-      expect(builder.getSymbolVertexShader()).to
-        .eql(`#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-uniform mat4 u_projectionMatrix;
-uniform mat4 u_screenToWorldMatrix;
-uniform vec2 u_viewportSizePx;
-uniform float u_pixelRatio;
-uniform float u_globalAlpha;
-uniform float u_time;
-uniform float u_zoom;
-uniform float u_resolution;
-uniform float u_rotation;
-uniform vec4 u_renderExtent;
-uniform mediump int u_hitDetection;
-
-const float PI = 3.141592653589793238;
-const float TWO_PI = 2.0 * PI;
-
+      expect(builder.getSymbolVertexShader()).to.eql(`${COMMON_HEADER}
 
 attribute vec2 a_position;
 attribute float a_index;
-attribute vec4 a_hitColor;
+attribute vec4 a_prop_hitColor;
 
 varying vec2 v_texCoord;
 varying vec2 v_quadCoord;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying vec2 v_centerPx;
 varying float v_angle;
 varying vec2 v_quadSizePx;
@@ -313,7 +233,6 @@ varying vec2 v_quadSizePx;
 
 vec2 pxToScreen(vec2 coordPx) {
   vec2 scaled = coordPx / u_viewportSizePx / 0.5;
-  
   return scaled;
 }
 
@@ -336,18 +255,18 @@ void main(void) {
     offsetPx += halfSizePx * vec2(-1., 1.);
   }
   float angle = u_time * 0.2;
+  
   float c = cos(-angle);
   float s = sin(-angle);
   offsetPx = vec2(c * offsetPx.x - s * offsetPx.y, s * offsetPx.x + c * offsetPx.y);
   vec4 center = u_projectionMatrix * vec4(a_position, 0.0, 1.0);
-  gl_Position = center + vec4(pxToScreen(offsetPx), 0., 0.);
+  gl_Position = center + vec4(pxToScreen(offsetPx), u_depth, 0.);
   vec4 texCoord = vec4(0.0, 0.0, 1.0, 1.0);
   float u = a_index == 0.0 || a_index == 3.0 ? texCoord.s : texCoord.p;
   float v = a_index == 2.0 || a_index == 3.0 ? texCoord.t : texCoord.q;
   v_texCoord = vec2(u, v);
-  v_hitColor = a_hitColor;
+  v_prop_hitColor = a_prop_hitColor;
   v_angle = angle;
-  
   c = cos(-v_angle);
   s = sin(-v_angle);
   centerOffsetPx = vec2(c * centerOffsetPx.x - s * centerOffsetPx.y, s * centerOffsetPx.x + c * centerOffsetPx.y); 
@@ -374,30 +293,10 @@ void main(void) {
       builder.setSymbolColorExpression(colorToGlsl([80, 0, 255]));
       builder.setTextureCoordinateExpression(arrayToGlsl([0, 0.5, 0.5, 1]));
 
-      expect(builder.getSymbolFragmentShader()).to
-        .eql(`#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-uniform mat4 u_projectionMatrix;
-uniform mat4 u_screenToWorldMatrix;
-uniform vec2 u_viewportSizePx;
-uniform float u_pixelRatio;
-uniform float u_globalAlpha;
-uniform float u_time;
-uniform float u_zoom;
-uniform float u_resolution;
-uniform float u_rotation;
-uniform vec4 u_renderExtent;
-uniform mediump int u_hitDetection;
-
-const float PI = 3.141592653589793238;
-const float TWO_PI = 2.0 * PI;
-
+      expect(builder.getSymbolFragmentShader()).to.eql(`${COMMON_HEADER}
 
 varying vec2 v_texCoord;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying vec2 v_centerPx;
 varying float v_angle;
 varying vec2 v_quadSizePx;
@@ -414,7 +313,7 @@ void main(void) {
   gl_FragColor = vec4(0.3137254901960784, 0.0, 1.0, 1.0);
   if (u_hitDetection > 0) {
     if (gl_FragColor.a < 0.05) { discard; };
-    gl_FragColor = v_hitColor;
+    gl_FragColor = v_prop_hitColor;
   }
 }`);
     });
@@ -428,31 +327,11 @@ void main(void) {
       builder.setTextureCoordinateExpression(arrayToGlsl([0, 0.5, 0.5, 1]));
       builder.setFragmentDiscardExpression('u_myUniform > 0.5');
 
-      expect(builder.getSymbolFragmentShader()).to
-        .eql(`#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-uniform mat4 u_projectionMatrix;
-uniform mat4 u_screenToWorldMatrix;
-uniform vec2 u_viewportSizePx;
-uniform float u_pixelRatio;
-uniform float u_globalAlpha;
-uniform float u_time;
-uniform float u_zoom;
-uniform float u_resolution;
-uniform float u_rotation;
-uniform vec4 u_renderExtent;
-uniform mediump int u_hitDetection;
-
-const float PI = 3.141592653589793238;
-const float TWO_PI = 2.0 * PI;
-
+      expect(builder.getSymbolFragmentShader()).to.eql(`${COMMON_HEADER}
 uniform float u_myUniform;
 uniform vec2 u_myUniform2;
 varying vec2 v_texCoord;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying vec2 v_centerPx;
 varying float v_angle;
 varying vec2 v_quadSizePx;
@@ -468,7 +347,7 @@ void main(void) {
   gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
   if (u_hitDetection > 0) {
     if (gl_FragColor.a < 0.05) { discard; };
-    gl_FragColor = v_hitColor;
+    gl_FragColor = v_prop_hitColor;
   }
 }`);
     });
@@ -500,27 +379,7 @@ void main(void) {
 
     describe('getStrokeVertexShader', () => {
       it('generates a stroke vertex shader (with uniforms, varying and attributes)', () => {
-        expect(builder.getStrokeVertexShader()).to
-          .eql(`#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-uniform mat4 u_projectionMatrix;
-uniform mat4 u_screenToWorldMatrix;
-uniform vec2 u_viewportSizePx;
-uniform float u_pixelRatio;
-uniform float u_globalAlpha;
-uniform float u_time;
-uniform float u_zoom;
-uniform float u_resolution;
-uniform float u_rotation;
-uniform vec4 u_renderExtent;
-uniform mediump int u_hitDetection;
-
-const float PI = 3.141592653589793238;
-const float TWO_PI = 2.0 * PI;
-
+        expect(builder.getStrokeVertexShader()).to.eql(`${COMMON_HEADER}
 uniform float u_myUniform;
 attribute vec2 a_position;
 attribute float a_index;
@@ -529,14 +388,14 @@ attribute vec2 a_segmentEnd;
 attribute float a_parameters;
 attribute float a_distance;
 attribute vec2 a_joinAngles;
-attribute vec4 a_hitColor;
+attribute vec4 a_prop_hitColor;
 attribute vec2 a_myAttr;
 varying vec2 v_segmentStart;
 varying vec2 v_segmentEnd;
 varying float v_angleStart;
 varying float v_angleEnd;
 varying float v_width;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying float v_distanceOffsetPx;
 varying float v_opacity;
 varying vec3 v_test;
@@ -548,7 +407,7 @@ vec2 worldToPx(vec2 worldPos) {
 
 vec4 pxToScreen(vec2 pxPos) {
   vec2 screenPos = 2.0 * pxPos / u_viewportSizePx - 1.0;
-  return vec4(screenPos, 0.0, 1.0);
+  return vec4(screenPos, u_depth, 1.0);
 }
 
 bool isCap(float joinAngle) {
@@ -576,7 +435,9 @@ vec2 getOffsetPoint(vec2 point, vec2 normal, float joinAngle, float offsetPx) {
 void main(void) {
   v_angleStart = a_joinAngles.x;
   v_angleEnd = a_joinAngles.y;
-  float vertexNumber = a_parameters;
+  float vertexNumber = floor(abs(a_parameters) / 10000. + 0.5);
+  // we're reading the fractional part while keeping the sign (so -4.12 gives -0.12, 3.45 gives 0.45)
+  float angleTangentSum = fract(abs(a_parameters) / 10000.) * 10000. * sign(a_parameters);
 
   float lineWidth = 4.0;
   float lineOffsetPx = 0.;
@@ -601,14 +462,14 @@ void main(void) {
   } else {
     joinDirection = getJoinOffsetDirection(normalPx * normalDir, angle);
   }
-  positionPx = positionPx + joinDirection * lineWidth * 0.5;
+  positionPx = positionPx + joinDirection * (lineWidth * 0.5 + 1.); // adding 1 pixel for antialiasing
   gl_Position = pxToScreen(positionPx);
 
   v_segmentStart = segmentStartPx;
   v_segmentEnd = segmentEndPx;
   v_width = lineWidth;
-  v_hitColor = a_hitColor;
-  v_distanceOffsetPx = a_distance / u_resolution;
+  v_prop_hitColor = a_prop_hitColor;
+  v_distanceOffsetPx = a_distance / u_resolution - (lineOffsetPx * angleTangentSum);
   v_opacity = 0.4;
   v_test = vec3(1.0, 2.0, 3.0);
 }`);
@@ -621,34 +482,14 @@ void main(void) {
     });
     describe('getStrokeFragmentShader', () => {
       it('generates a stroke fragment shader (with varying, attribute and uniform)', () => {
-        expect(builder.getStrokeFragmentShader()).to
-          .eql(`#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-uniform mat4 u_projectionMatrix;
-uniform mat4 u_screenToWorldMatrix;
-uniform vec2 u_viewportSizePx;
-uniform float u_pixelRatio;
-uniform float u_globalAlpha;
-uniform float u_time;
-uniform float u_zoom;
-uniform float u_resolution;
-uniform float u_rotation;
-uniform vec4 u_renderExtent;
-uniform mediump int u_hitDetection;
-
-const float PI = 3.141592653589793238;
-const float TWO_PI = 2.0 * PI;
-
+        expect(builder.getStrokeFragmentShader()).to.eql(`${COMMON_HEADER}
 uniform float u_myUniform;
 varying vec2 v_segmentStart;
 varying vec2 v_segmentEnd;
 varying float v_angleStart;
 varying float v_angleEnd;
 varying float v_width;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying float v_distanceOffsetPx;
 varying float v_opacity;
 varying vec3 v_test;
@@ -740,13 +581,13 @@ float computeSegmentPointDistance(vec2 point, vec2 start, vec2 end, float width,
 void main(void) {
   vec2 currentPoint = gl_FragCoord.xy / u_pixelRatio;
   #ifdef GL_FRAGMENT_PRECISION_HIGH
-  vec2 v_worldPos = pxToWorld(currentPoint);
+  vec2 worldPos = pxToWorld(currentPoint);
   if (
     abs(u_renderExtent[0] - u_renderExtent[2]) > 0.0 && (
-      v_worldPos[0] < u_renderExtent[0] ||
-      v_worldPos[1] < u_renderExtent[1] ||
-      v_worldPos[0] > u_renderExtent[2] ||
-      v_worldPos[1] > u_renderExtent[3]
+      worldPos[0] < u_renderExtent[0] ||
+      worldPos[1] < u_renderExtent[1] ||
+      worldPos[0] > u_renderExtent[2] ||
+      worldPos[1] > u_renderExtent[3]
     )
   ) {
     discard;
@@ -760,6 +601,7 @@ void main(void) {
   vec2 startToPoint = currentPoint - v_segmentStart;
   float currentLengthPx = max(0., min(dot(segmentTangent, startToPoint), segmentLength)) + v_distanceOffsetPx; 
   float currentRadiusPx = abs(dot(segmentNormal, startToPoint));
+  float currentRadiusRatio = dot(segmentNormal, startToPoint) * 2. / v_width;
   vec4 color = vec4(0.3137254901960784, 0.0, 1.0, 1.0) * u_globalAlpha;
   float capType = ${stringToGlsl('butt')};
   float joinType = ${stringToGlsl('bevel')};
@@ -770,10 +612,10 @@ void main(void) {
     max(segmentStartDistance, segmentEndDistance)
   );
   distance = max(distance, cos(currentLengthPx));
-  gl_FragColor = color * smoothstep(0., -1., distance);
+  gl_FragColor = color * smoothstep(0.5, -0.5, distance);
   if (u_hitDetection > 0) {
     if (gl_FragColor.a < 0.1) { discard; };
-    gl_FragColor = v_hitColor;
+    gl_FragColor = v_prop_hitColor;
   }
 }`);
       });
@@ -795,37 +637,18 @@ void main(void) {
       builder.setFillColorExpression(colorToGlsl([80, 0, 255, 1]));
       builder.setFragmentDiscardExpression('u_myUniform > 0.5');
 
-      expect(builder.getFillVertexShader()).to
-        .eql(`#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-uniform mat4 u_projectionMatrix;
-uniform mat4 u_screenToWorldMatrix;
-uniform vec2 u_viewportSizePx;
-uniform float u_pixelRatio;
-uniform float u_globalAlpha;
-uniform float u_time;
-uniform float u_zoom;
-uniform float u_resolution;
-uniform float u_rotation;
-uniform vec4 u_renderExtent;
-uniform mediump int u_hitDetection;
-
-const float PI = 3.141592653589793238;
-const float TWO_PI = 2.0 * PI;
-
+      expect(builder.getFillVertexShader()).to.eql(`${COMMON_HEADER}
 uniform float u_myUniform;
 attribute vec2 a_position;
-attribute vec4 a_hitColor;
+attribute vec4 a_prop_hitColor;
 attribute vec2 a_myAttr;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying float v_opacity;
 varying vec3 v_test;
 
 void main(void) {
-  gl_Position = u_projectionMatrix * vec4(a_position, 0.0, 1.0);
+  gl_Position = u_projectionMatrix * vec4(a_position, u_depth, 1.0);
+  v_prop_hitColor = a_prop_hitColor;
   v_opacity = 0.4;
   v_test = vec3(1.0, 2.0, 3.0);
 }`);
@@ -846,29 +669,9 @@ void main(void) {
       builder.setFillColorExpression(colorToGlsl([80, 0, 255, 1]));
       builder.setFragmentDiscardExpression('u_myUniform > 0.5');
 
-      expect(builder.getFillFragmentShader()).to
-        .eql(`#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-uniform mat4 u_projectionMatrix;
-uniform mat4 u_screenToWorldMatrix;
-uniform vec2 u_viewportSizePx;
-uniform float u_pixelRatio;
-uniform float u_globalAlpha;
-uniform float u_time;
-uniform float u_zoom;
-uniform float u_resolution;
-uniform float u_rotation;
-uniform vec4 u_renderExtent;
-uniform mediump int u_hitDetection;
-
-const float PI = 3.141592653589793238;
-const float TWO_PI = 2.0 * PI;
-
+      expect(builder.getFillFragmentShader()).to.eql(`${COMMON_HEADER}
 uniform float u_myUniform;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying float v_opacity;
 varying vec3 v_test;
 
@@ -877,15 +680,22 @@ vec2 pxToWorld(vec2 pxPos) {
   return (u_screenToWorldMatrix * vec4(screenPos, 0.0, 1.0)).xy;
 }
 
+vec2 worldToPx(vec2 worldPos) {
+  vec4 screenPos = u_projectionMatrix * vec4(worldPos, 0.0, 1.0);
+  return (0.5 * screenPos.xy + 0.5) * u_viewportSizePx;
+}
+
 void main(void) {
+  vec2 pxPos = gl_FragCoord.xy / u_pixelRatio;
+  vec2 pxOrigin = worldToPx(u_patternOrigin);
   #ifdef GL_FRAGMENT_PRECISION_HIGH
-  vec2 v_worldPos = pxToWorld(gl_FragCoord.xy / u_pixelRatio);
+  vec2 worldPos = pxToWorld(pxPos);
   if (
     abs(u_renderExtent[0] - u_renderExtent[2]) > 0.0 && (
-      v_worldPos[0] < u_renderExtent[0] ||
-      v_worldPos[1] < u_renderExtent[1] ||
-      v_worldPos[0] > u_renderExtent[2] ||
-      v_worldPos[1] > u_renderExtent[3]
+      worldPos[0] < u_renderExtent[0] ||
+      worldPos[1] < u_renderExtent[1] ||
+      worldPos[0] > u_renderExtent[2] ||
+      worldPos[1] > u_renderExtent[3]
     )
   ) {
     discard;
@@ -895,7 +705,7 @@ void main(void) {
   gl_FragColor = vec4(0.3137254901960784, 0.0, 1.0, 1.0) * u_globalAlpha;
   if (u_hitDetection > 0) {
     if (gl_FragColor.a < 0.1) { discard; };
-    gl_FragColor = v_hitColor;
+    gl_FragColor = v_prop_hitColor;
   }
 }`);
     });

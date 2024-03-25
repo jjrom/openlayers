@@ -118,16 +118,19 @@ describe('ol/webgl/WebGLHelper', function () {
 
   describe('operations', function () {
     describe('prepare draw', function () {
-      let program;
+      let program, uniformTexture;
       beforeEach(function () {
+        uniformTexture = null;
         h = new WebGLHelper({
           uniforms: {
             u_test1: 42,
             u_test2: [1, 3],
             u_test3: document.createElement('canvas'),
             u_test4: createTransform(),
+            u_test5: () => uniformTexture,
           },
         });
+        uniformTexture = h.getGL().createTexture();
         program = h.getProgram(FRAGMENT_SHADER, VERTEX_SHADER);
         h.useProgram(program, SAMPLE_FRAMESTATE);
         h.prepareDraw({
@@ -151,28 +154,31 @@ describe('ol/webgl/WebGLHelper', function () {
         expect(uniformLocations[DefaultUniform.TIME]).not.to.eql(undefined);
         expect(uniformLocations[DefaultUniform.ZOOM]).not.to.eql(undefined);
         expect(uniformLocations[DefaultUniform.RESOLUTION]).not.to.eql(
-          undefined
+          undefined,
         );
         expect(uniformLocations[DefaultUniform.VIEWPORT_SIZE_PX]).not.to.eql(
-          undefined
+          undefined,
         );
         expect(uniformLocations[DefaultUniform.PIXEL_RATIO]).not.to.eql(
-          undefined
+          undefined,
         );
         expect(uniformLocations[DefaultUniform.ROTATION]).not.to.eql(undefined);
       });
 
       it('has processed uniforms', function () {
-        expect(h.uniforms_.length).to.eql(4);
+        expect(h.uniforms_.length).to.eql(5);
         expect(h.uniforms_[0].name).to.eql('u_test1');
         expect(h.uniforms_[1].name).to.eql('u_test2');
         expect(h.uniforms_[2].name).to.eql('u_test3');
         expect(h.uniforms_[3].name).to.eql('u_test4');
+        expect(h.uniforms_[4].name).to.eql('u_test5');
         expect(h.uniforms_[0].location).to.not.eql(-1);
         expect(h.uniforms_[1].location).to.not.eql(-1);
         expect(h.uniforms_[2].location).to.not.eql(-1);
         expect(h.uniforms_[3].location).to.not.eql(-1);
+        expect(h.uniforms_[4].location).to.not.eql(-1);
         expect(h.uniforms_[2].texture).to.not.eql(undefined);
+        expect(h.uniforms_[4].texture).to.eql(uniformTexture);
       });
 
       describe('avoid resizing the canvas if not required', () => {
@@ -233,18 +239,18 @@ describe('ol/webgl/WebGLHelper', function () {
       it('throws for an invalid vertex shader', function () {
         h = new WebGLHelper();
         expect(() =>
-          h.getProgram(FRAGMENT_SHADER, INVALID_VERTEX_SHADER)
+          h.getProgram(FRAGMENT_SHADER, INVALID_VERTEX_SHADER),
         ).to.throwException(
-          /Vertex shader compilation failed: ERROR: 0:10: 'bla' : syntax error/
+          /Vertex shader compilation failed: ERROR: 0:10: 'bla' : syntax error/,
         );
       });
 
       it('throws for an invalid fragment shader', function () {
         h = new WebGLHelper();
         expect(() =>
-          h.getProgram(INVALID_FRAGMENT_SHADER, VERTEX_SHADER)
+          h.getProgram(INVALID_FRAGMENT_SHADER, VERTEX_SHADER),
         ).to.throwException(
-          /Fragment shader compilation failed: ERROR: 0:5: 'oops' : undeclared identifier/
+          /Fragment shader compilation failed: ERROR: 0:5: 'oops' : undeclared identifier/,
         );
       });
     });
@@ -270,13 +276,13 @@ describe('ol/webgl/WebGLHelper', function () {
         translateTransform(
           expected,
           -SAMPLE_FRAMESTATE.viewState.center[0],
-          -SAMPLE_FRAMESTATE.viewState.center[1]
+          -SAMPLE_FRAMESTATE.viewState.center[1],
         );
 
         h.makeProjectionTransform(SAMPLE_FRAMESTATE, given);
 
         expect(given.map((val) => val.toFixed(15))).to.eql(
-          expected.map((val) => val.toFixed(15))
+          expected.map((val) => val.toFixed(15)),
         );
       });
     });
@@ -313,7 +319,7 @@ describe('ol/webgl/WebGLHelper', function () {
           gl.COLOR_ATTACHMENT0,
           gl.TEXTURE_2D,
           t,
-          0
+          0,
         );
         const data = new Uint8Array(width * height * 4);
         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
@@ -350,7 +356,7 @@ describe('ol/webgl/WebGLHelper', function () {
           gl.COLOR_ATTACHMENT0,
           gl.TEXTURE_2D,
           t,
-          0
+          0,
         );
         const data = new Uint8Array(width * height * 4);
         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
@@ -413,9 +419,9 @@ describe('ol/webgl/WebGLHelper', function () {
 
         void main(void) {
           gl_Position = vec4(u_test, attr3, 0.0, 1.0);
-        }`
+        }`,
         ),
-        SAMPLE_FRAMESTATE
+        SAMPLE_FRAMESTATE,
       );
     });
 

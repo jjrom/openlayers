@@ -64,7 +64,7 @@ class ImageMapGuide extends ImageSource {
      * @private
      * @type {!Object}
      */
-    this.params_ = options.params || {};
+    this.params_ = Object.assign({}, options.params);
 
     /**
      * @private
@@ -109,15 +109,15 @@ class ImageMapGuide extends ImageSource {
 
     /**
      * @private
-     * @type {import("../Image.js").default}
-     */
-    this.image_ = null;
-
-    /**
-     * @private
      * @type {number}
      */
     this.renderedRevision_ = 0;
+
+    /**
+     * @private
+     * @type {import("../proj/Projection.js").default}
+     */
+    this.loaderProjection_ = null;
   }
 
   /**
@@ -141,8 +141,9 @@ class ImageMapGuide extends ImageSource {
     if (this.url_ === undefined) {
       return null;
     }
-    if (!this.loader) {
+    if (!this.loader || this.loaderProjection_ !== projection) {
       // Lazily create loader to pick up the view projection and to allow `params` updates
+      this.loaderProjection_ = projection;
       this.loader = createLoader({
         crossOrigin: this.crossOrigin_,
         params: this.params_,
@@ -187,9 +188,13 @@ class ImageMapGuide extends ImageSource {
    * @api
    */
   setImageLoadFunction(imageLoadFunction) {
-    this.image_ = null;
     this.imageLoadFunction_ = imageLoadFunction;
     this.changed();
+  }
+
+  changed() {
+    this.image = null;
+    super.changed();
   }
 }
 

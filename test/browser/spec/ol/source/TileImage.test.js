@@ -19,15 +19,16 @@ import {listen} from '../../../../../src/ol/events.js';
 import {register} from '../../../../../src/ol/proj/proj4.js';
 
 describe('ol/source/TileImage', function () {
-  function createSource(opt_proj, opt_tileGrid, opt_cacheSize) {
+  function createSource(opt_proj, opt_tileGrid, opt_cacheSize, opt_transition) {
     const proj = opt_proj || 'EPSG:3857';
     return new TileImage({
       cacheSize: opt_cacheSize,
       projection: proj,
       tileGrid: opt_tileGrid || createForProjection(proj, undefined, [2, 2]),
       tileUrlFunction: createFromTemplate(
-        'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs='
+        'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=',
       ),
+      transition: opt_transition,
     });
   }
 
@@ -47,11 +48,11 @@ describe('ol/source/TileImage', function () {
     it('uses the cacheSize for reprojected tile caches', function () {
       const source = createSource(undefined, undefined, 442);
       const tileCache = source.getTileCacheForProjection(
-        getProjection('EPSG:4326')
+        getProjection('EPSG:4326'),
       );
       expect(tileCache.highWaterMark).to.be(442);
       expect(tileCache).to.not.equal(
-        source.getTileCacheForProjection(source.getProjection())
+        source.getTileCacheForProjection(source.getProjection()),
       );
     });
   });
@@ -62,7 +63,7 @@ describe('ol/source/TileImage', function () {
       const tileGrid = createForProjection('EPSG:4326', 3, [10, 20]);
       source.setTileGridForProjection('EPSG:4326', tileGrid);
       const retrieved = source.getTileGridForProjection(
-        getProjection('EPSG:4326')
+        getProjection('EPSG:4326'),
       );
       expect(retrieved).to.be(tileGrid);
     });
@@ -116,7 +117,7 @@ describe('ol/source/TileImage', function () {
         0,
         0,
         1,
-        getProjection('EPSG:3857')
+        getProjection('EPSG:3857'),
       );
       expect(returnedTile).to.be(tile);
     });
@@ -132,7 +133,7 @@ describe('ol/source/TileImage', function () {
             0,
             0,
             1,
-            getProjection('EPSG:3857')
+            getProjection('EPSG:3857'),
           );
           expect(returnedTile).not.to.be(tile);
           expect(returnedTile.key).to.be('key0');
@@ -151,7 +152,7 @@ describe('ol/source/TileImage', function () {
             0,
             0,
             1,
-            getProjection('EPSG:3857')
+            getProjection('EPSG:3857'),
           );
           expect(returnedTile).not.to.be(tile);
           expect(returnedTile.key).to.be('key0');
@@ -172,7 +173,7 @@ describe('ol/source/TileImage', function () {
             0,
             0,
             1,
-            getProjection('EPSG:3857')
+            getProjection('EPSG:3857'),
           );
           dynamicParamsKey = 'key1';
           returnedTile = source.getTileInternal(
@@ -180,7 +181,7 @@ describe('ol/source/TileImage', function () {
             0,
             0,
             1,
-            getProjection('EPSG:3857')
+            getProjection('EPSG:3857'),
           );
           expect(returnedTile).not.to.be(tile);
           expect(returnedTile.key).to.be('key1');
@@ -198,7 +199,7 @@ describe('ol/source/TileImage', function () {
         0,
         0,
         1,
-        getProjection('EPSG:3857')
+        getProjection('EPSG:3857'),
       );
       expect(tile3857).to.be.a(ImageTile);
       expect(tile3857).not.to.be.a(ReprojTile);
@@ -230,7 +231,7 @@ describe('ol/source/TileImage', function () {
         createXYZ({
           extent: [-180, -90, 180, 90],
           tileSize: [2, 2],
-        })
+        }),
       );
       const tile = source.getTile(0, 0, 0, 1, getProjection('EPSG:3857'));
       expect(tile).to.be.a(ReprojTile);
@@ -252,7 +253,7 @@ describe('ol/source/TileImage', function () {
         createXYZ({
           extent: WORLD_EXTENT,
           tileSize: [2, 2],
-        })
+        }),
       );
       const tile = source.getTile(0, 0, 0, 1, proj);
       expect(tile).to.be.a(ReprojTile);
@@ -293,7 +294,7 @@ describe('ol/source/TileImage', function () {
     it('works for loading-error-loading-loaded sequences', function (done) {
       source.setTileLoadFunction(function (tile) {
         tile.setState(
-          tile.state == TileState.ERROR ? TileState.LOADED : TileState.ERROR
+          tile.state == TileState.ERROR ? TileState.LOADED : TileState.ERROR,
         );
       });
       const startSpy = sinon.spy();
@@ -313,6 +314,22 @@ describe('ol/source/TileImage', function () {
       });
       const tile = source.getTile(0, 0, 0, 1, getProjection('EPSG:3857'));
       tile.load();
+    });
+  });
+
+  describe('transition option', function () {
+    it('reproj tile transition should be same with source tile', function () {
+      const transition = 0;
+      const source = createSource(
+        'EPSG:3857',
+        undefined,
+        undefined,
+        transition,
+      );
+      const tile = source.getTile(0, 0, 0, 1, getProjection('EPSG:4326'));
+
+      expect(tile).to.be.a(ReprojTile);
+      expect(tile.transition_).to.be(transition);
     });
   });
 });

@@ -41,7 +41,7 @@ const style = {
   filter: [
     'any',
     ['==', ['var', 'filterShape'], 'all'],
-    ['==', ['var', 'filterShape'], ['get', 'shape', 'string']],
+    ['==', ['var', 'filterShape'], ['get', 'shape']],
   ],
   'icon-src': 'data/ufo_shapes.png',
   'icon-width': 128,
@@ -124,7 +124,7 @@ client.addEventListener('load', function () {
         shape: shape,
         duration: line[3],
         geometry: new Point(fromLonLat(coords)),
-      })
+      }),
     );
   }
   shapeTypes['all'] = features.length;
@@ -135,7 +135,7 @@ client.addEventListener('load', function () {
         attributions: 'National UFO Reporting Center',
       }),
       style: style,
-    })
+    }),
   );
   fillShapeSelect(shapeTypes);
 });

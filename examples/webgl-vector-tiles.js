@@ -23,18 +23,7 @@ class WebGLVectorTileLayer extends VectorTile {
   createRenderer() {
     return new WebGLVectorTileLayerRenderer(this, {
       style: {
-        fill: {
-          fragment: result.builder.getFillFragmentShader(),
-          vertex: result.builder.getFillVertexShader(),
-        },
-        stroke: {
-          fragment: result.builder.getStrokeFragmentShader(),
-          vertex: result.builder.getStrokeVertexShader(),
-        },
-        symbol: {
-          fragment: result.builder.getSymbolFragmentShader(),
-          vertex: result.builder.getSymbolVertexShader(),
-        },
+        builder: result.builder,
         attributes: {
           fillColor: {
             size: 2,
@@ -56,7 +45,7 @@ class WebGLVectorTileLayer extends VectorTile {
             size: 1,
             callback: (feature) => {
               const style = this.getStyle()(feature, 1)[0];
-              return style?.getStroke()?.getWidth() * 2 || 0;
+              return style?.getStroke()?.getWidth() || 0;
             },
           },
         },

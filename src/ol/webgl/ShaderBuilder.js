@@ -2,10 +2,11 @@
  * Class for generating shaders from literal style objects
  * @module ol/webgl/ShaderBuilder
  */
-import {colorToGlsl, numberToGlsl, stringToGlsl} from '../style/expressions.js';
+import {LINESTRING_ANGLE_COSINE_CUTOFF} from '../render/webgl/utils.js';
+import {colorToGlsl, numberToGlsl, stringToGlsl} from '../expr/gpu.js';
 import {createDefaultStyle} from '../style/flat.js';
 
-const COMMON_HEADER = `#ifdef GL_FRAGMENT_PRECISION_HIGH
+export const COMMON_HEADER = `#ifdef GL_FRAGMENT_PRECISION_HIGH
 precision highp float;
 #else
 precision mediump float;
@@ -20,10 +21,18 @@ uniform float u_zoom;
 uniform float u_resolution;
 uniform float u_rotation;
 uniform vec4 u_renderExtent;
+uniform vec2 u_patternOrigin;
+uniform float u_depth;
 uniform mediump int u_hitDetection;
 
 const float PI = 3.141592653589793238;
 const float TWO_PI = 2.0 * PI;
+
+// this used to produce an alpha-premultiplied color from a texture
+vec4 samplePremultiplied(sampler2D sampler, vec2 texCoord) {
+  vec4 color = texture2D(sampler, texCoord);
+  return vec4(color.rgb * color.a, color.a);
+}
 `;
 
 const DEFAULT_STYLE = createDefaultStyle();
@@ -47,7 +56,7 @@ const DEFAULT_STYLE = createDefaultStyle();
  *   .addUniform('u_time')
  *   .setColorExpression('...')
  *   .setSymbolSizeExpression('...')
- *   .outputSymbolFragmentShader();
+ *   .getSymbolFragmentShader();
  * ```
  */
 export class ShaderBuilder {
@@ -84,7 +93,7 @@ export class ShaderBuilder {
      * @private
      */
     this.symbolSizeExpression_ = `vec2(${numberToGlsl(
-      DEFAULT_STYLE['circle-radius']
+      DEFAULT_STYLE['circle-radius'],
     )} + ${numberToGlsl(DEFAULT_STYLE['circle-stroke-width'] * 0.5)})`;
 
     /**
@@ -104,7 +113,7 @@ export class ShaderBuilder {
      * @private
      */
     this.symbolColorExpression_ = colorToGlsl(
-      /** @type {string} */ (DEFAULT_STYLE['circle-fill-color'])
+      /** @type {string} */ (DEFAULT_STYLE['circle-fill-color']),
     );
 
     /**
@@ -142,7 +151,7 @@ export class ShaderBuilder {
      * @private
      */
     this.strokeColorExpression_ = colorToGlsl(
-      /** @type {string} */ (DEFAULT_STYLE['stroke-color'])
+      /** @type {string} */ (DEFAULT_STYLE['stroke-color']),
     );
 
     /**
@@ -181,7 +190,7 @@ export class ShaderBuilder {
      * @private
      */
     this.fillColorExpression_ = colorToGlsl(
-      /** @type {string} */ (DEFAULT_STYLE['fill-color'])
+      /** @type {string} */ (DEFAULT_STYLE['fill-color']),
     );
 
     /**
@@ -334,6 +343,13 @@ export class ShaderBuilder {
   }
 
   /**
+   * @return {string} The current fragment discard expression
+   */
+  getFragmentDiscardExpression() {
+    return this.discardExpression_;
+  }
+
+  /**
    * Sets whether the symbols should rotate with the view or stay aligned with the map.
    * Note: will only be used for point geometry shaders.
    * @param {boolean} rotateWithView Rotate with view
@@ -355,13 +371,20 @@ export class ShaderBuilder {
   }
 
   /**
-   * @param {string} expression Stroke color expression, evaluate to `vec4`
+   * @param {string} expression Stroke color expression, evaluate to `vec4`: can rely on currentLengthPx and currentRadiusPx
    * @return {ShaderBuilder} the builder object
    */
   setStrokeColorExpression(expression) {
     this.hasStroke_ = true;
     this.strokeColorExpression_ = expression;
     return this;
+  }
+
+  /**
+   * @return {string} The current stroke color expression
+   */
+  getStrokeColorExpression() {
+    return this.strokeColorExpression_;
   }
 
   /**
@@ -420,6 +443,13 @@ export class ShaderBuilder {
     return this;
   }
 
+  /**
+   * @return {string} The current fill color expression
+   */
+  getFillColorExpression() {
+    return this.fillColorExpression_;
+  }
+
   addVertexShaderFunction(code) {
     if (this.vertexShaderFunctions_.includes(code)) {
       return;
@@ -450,7 +480,7 @@ ${this.uniforms_
   .join('\n')}
 attribute vec2 a_position;
 attribute float a_index;
-attribute vec4 a_hitColor;
+attribute vec4 a_prop_hitColor;
 ${this.attributes_
   .map(function (attribute) {
     return 'attribute ' + attribute + ';';
@@ -458,7 +488,7 @@ ${this.attributes_
   .join('\n')}
 varying vec2 v_texCoord;
 varying vec2 v_quadCoord;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying vec2 v_centerPx;
 varying float v_angle;
 varying vec2 v_quadSizePx;
@@ -470,11 +500,6 @@ ${this.varyings_
 ${this.vertexShaderFunctions_.join('\n')}
 vec2 pxToScreen(vec2 coordPx) {
   vec2 scaled = coordPx / u_viewportSizePx / 0.5;
-  ${
-    this.symbolRotateWithView_
-      ? 'scaled = vec2(scaled.x * cos(-u_rotation) - scaled.y * sin(-u_rotation), scaled.x * sin(-u_rotation) + scaled.y * cos(-u_rotation));'
-      : ''
-  }
   return scaled;
 }
 
@@ -497,18 +522,18 @@ void main(void) {
     offsetPx += halfSizePx * vec2(-1., 1.);
   }
   float angle = ${this.symbolRotationExpression_};
+  ${this.symbolRotateWithView_ ? 'angle += u_rotation;' : ''}
   float c = cos(-angle);
   float s = sin(-angle);
   offsetPx = vec2(c * offsetPx.x - s * offsetPx.y, s * offsetPx.x + c * offsetPx.y);
   vec4 center = u_projectionMatrix * vec4(a_position, 0.0, 1.0);
-  gl_Position = center + vec4(pxToScreen(offsetPx), 0., 0.);
+  gl_Position = center + vec4(pxToScreen(offsetPx), u_depth, 0.);
   vec4 texCoord = ${this.texCoordExpression_};
   float u = a_index == 0.0 || a_index == 3.0 ? texCoord.s : texCoord.p;
   float v = a_index == 2.0 || a_index == 3.0 ? texCoord.t : texCoord.q;
   v_texCoord = vec2(u, v);
-  v_hitColor = a_hitColor;
+  v_prop_hitColor = a_prop_hitColor;
   v_angle = angle;
-  ${this.symbolRotateWithView_ ? 'v_angle += u_rotation;' : ''}
   c = cos(-v_angle);
   s = sin(-v_angle);
   centerOffsetPx = vec2(c * centerOffsetPx.x - s * centerOffsetPx.y, s * centerOffsetPx.x + c * centerOffsetPx.y); 
@@ -537,7 +562,7 @@ ${this.uniforms_
   })
   .join('\n')}
 varying vec2 v_texCoord;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying vec2 v_centerPx;
 varying float v_angle;
 varying vec2 v_quadSizePx;
@@ -557,7 +582,7 @@ void main(void) {
   gl_FragColor = ${this.symbolColorExpression_};
   if (u_hitDetection > 0) {
     if (gl_FragColor.a < 0.05) { discard; };
-    gl_FragColor = v_hitColor;
+    gl_FragColor = v_prop_hitColor;
   }
 }`;
   }
@@ -584,7 +609,7 @@ attribute vec2 a_segmentEnd;
 attribute float a_parameters;
 attribute float a_distance;
 attribute vec2 a_joinAngles;
-attribute vec4 a_hitColor;
+attribute vec4 a_prop_hitColor;
 ${this.attributes_
   .map(function (attribute) {
     return 'attribute ' + attribute + ';';
@@ -595,7 +620,7 @@ varying vec2 v_segmentEnd;
 varying float v_angleStart;
 varying float v_angleEnd;
 varying float v_width;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying float v_distanceOffsetPx;
 ${this.varyings_
   .map(function (varying) {
@@ -610,7 +635,7 @@ vec2 worldToPx(vec2 worldPos) {
 
 vec4 pxToScreen(vec2 pxPos) {
   vec2 screenPos = 2.0 * pxPos / u_viewportSizePx - 1.0;
-  return vec4(screenPos, 0.0, 1.0);
+  return vec4(screenPos, u_depth, 1.0);
 }
 
 bool isCap(float joinAngle) {
@@ -638,7 +663,9 @@ vec2 getOffsetPoint(vec2 point, vec2 normal, float joinAngle, float offsetPx) {
 void main(void) {
   v_angleStart = a_joinAngles.x;
   v_angleEnd = a_joinAngles.y;
-  float vertexNumber = a_parameters;
+  float vertexNumber = floor(abs(a_parameters) / 10000. + 0.5);
+  // we're reading the fractional part while keeping the sign (so -4.12 gives -0.12, 3.45 gives 0.45)
+  float angleTangentSum = fract(abs(a_parameters) / 10000.) * 10000. * sign(a_parameters);
 
   float lineWidth = ${this.strokeWidthExpression_};
   float lineOffsetPx = ${this.strokeOffsetExpression_};
@@ -658,19 +685,19 @@ void main(void) {
   vec2 joinDirection;
   vec2 positionPx = vertexNumber < 1.5 ? segmentStartPx : segmentEndPx;
   // if angle is too high, do not make a proper join
-  if (cos(angle) > 0.985 || isCap(angle)) {
+  if (cos(angle) > ${LINESTRING_ANGLE_COSINE_CUTOFF} || isCap(angle)) {
     joinDirection = normalPx * normalDir - tangentPx * tangentDir;
   } else {
     joinDirection = getJoinOffsetDirection(normalPx * normalDir, angle);
   }
-  positionPx = positionPx + joinDirection * lineWidth * 0.5;
+  positionPx = positionPx + joinDirection * (lineWidth * 0.5 + 1.); // adding 1 pixel for antialiasing
   gl_Position = pxToScreen(positionPx);
 
   v_segmentStart = segmentStartPx;
   v_segmentEnd = segmentEndPx;
   v_width = lineWidth;
-  v_hitColor = a_hitColor;
-  v_distanceOffsetPx = a_distance / u_resolution;
+  v_prop_hitColor = a_prop_hitColor;
+  v_distanceOffsetPx = a_distance / u_resolution - (lineOffsetPx * angleTangentSum);
 ${this.varyings_
   .map(function (varying) {
     return '  ' + varying.name + ' = ' + varying.expression + ';';
@@ -700,7 +727,7 @@ varying vec2 v_segmentEnd;
 varying float v_angleStart;
 varying float v_angleEnd;
 varying float v_width;
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 varying float v_distanceOffsetPx;
 ${this.varyings_
   .map(function (varying) {
@@ -756,7 +783,7 @@ float bevelJoinField(vec2 point, vec2 start, vec2 end, float width, float joinAn
 }
 
 float miterJoinDistanceField(vec2 point, vec2 start, vec2 end, float width, float joinAngle) {
-  if (cos(joinAngle) > 0.985) { // avoid risking a division by zero
+  if (cos(joinAngle) > ${LINESTRING_ANGLE_COSINE_CUTOFF}) { // avoid risking a division by zero
     return bevelJoinField(point, start, end, width, joinAngle);
   }
   float miterLength = 1. / sin(joinAngle * 0.5);
@@ -795,13 +822,13 @@ float computeSegmentPointDistance(vec2 point, vec2 start, vec2 end, float width,
 void main(void) {
   vec2 currentPoint = gl_FragCoord.xy / u_pixelRatio;
   #ifdef GL_FRAGMENT_PRECISION_HIGH
-  vec2 v_worldPos = pxToWorld(currentPoint);
+  vec2 worldPos = pxToWorld(currentPoint);
   if (
     abs(u_renderExtent[0] - u_renderExtent[2]) > 0.0 && (
-      v_worldPos[0] < u_renderExtent[0] ||
-      v_worldPos[1] < u_renderExtent[1] ||
-      v_worldPos[0] > u_renderExtent[2] ||
-      v_worldPos[1] > u_renderExtent[3]
+      worldPos[0] < u_renderExtent[0] ||
+      worldPos[1] < u_renderExtent[1] ||
+      worldPos[0] > u_renderExtent[2] ||
+      worldPos[1] > u_renderExtent[3]
     )
   ) {
     discard;
@@ -815,6 +842,7 @@ void main(void) {
   vec2 startToPoint = currentPoint - v_segmentStart;
   float currentLengthPx = max(0., min(dot(segmentTangent, startToPoint), segmentLength)) + v_distanceOffsetPx; 
   float currentRadiusPx = abs(dot(segmentNormal, startToPoint));
+  float currentRadiusRatio = dot(segmentNormal, startToPoint) * 2. / v_width;
   vec4 color = ${this.strokeColorExpression_} * u_globalAlpha;
   float capType = ${this.strokeCapExpression_};
   float joinType = ${this.strokeJoinExpression_};
@@ -825,10 +853,10 @@ void main(void) {
     max(segmentStartDistance, segmentEndDistance)
   );
   distance = max(distance, ${this.strokeDistanceFieldExpression_});
-  gl_FragColor = color * smoothstep(0., -1., distance);
+  gl_FragColor = color * smoothstep(0.5, -0.5, distance);
   if (u_hitDetection > 0) {
     if (gl_FragColor.a < 0.1) { discard; };
-    gl_FragColor = v_hitColor;
+    gl_FragColor = v_prop_hitColor;
   }
 }`;
   }
@@ -850,13 +878,13 @@ ${this.uniforms_
   })
   .join('\n')}
 attribute vec2 a_position;
-attribute vec4 a_hitColor;
+attribute vec4 a_prop_hitColor;
 ${this.attributes_
   .map(function (attribute) {
     return 'attribute ' + attribute + ';';
   })
   .join('\n')}
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 ${this.varyings_
   .map(function (varying) {
     return 'varying ' + varying.type + ' ' + varying.name + ';';
@@ -864,7 +892,8 @@ ${this.varyings_
   .join('\n')}
 ${this.vertexShaderFunctions_.join('\n')}
 void main(void) {
-  gl_Position = u_projectionMatrix * vec4(a_position, 0.0, 1.0);
+  gl_Position = u_projectionMatrix * vec4(a_position, u_depth, 1.0);
+  v_prop_hitColor = a_prop_hitColor;
 ${this.varyings_
   .map(function (varying) {
     return '  ' + varying.name + ' = ' + varying.expression + ';';
@@ -888,7 +917,7 @@ ${this.uniforms_
     return 'uniform ' + uniform + ';';
   })
   .join('\n')}
-varying vec4 v_hitColor;
+varying vec4 v_prop_hitColor;
 ${this.varyings_
   .map(function (varying) {
     return 'varying ' + varying.type + ' ' + varying.name + ';';
@@ -900,15 +929,22 @@ vec2 pxToWorld(vec2 pxPos) {
   return (u_screenToWorldMatrix * vec4(screenPos, 0.0, 1.0)).xy;
 }
 
+vec2 worldToPx(vec2 worldPos) {
+  vec4 screenPos = u_projectionMatrix * vec4(worldPos, 0.0, 1.0);
+  return (0.5 * screenPos.xy + 0.5) * u_viewportSizePx;
+}
+
 void main(void) {
+  vec2 pxPos = gl_FragCoord.xy / u_pixelRatio;
+  vec2 pxOrigin = worldToPx(u_patternOrigin);
   #ifdef GL_FRAGMENT_PRECISION_HIGH
-  vec2 v_worldPos = pxToWorld(gl_FragCoord.xy / u_pixelRatio);
+  vec2 worldPos = pxToWorld(pxPos);
   if (
     abs(u_renderExtent[0] - u_renderExtent[2]) > 0.0 && (
-      v_worldPos[0] < u_renderExtent[0] ||
-      v_worldPos[1] < u_renderExtent[1] ||
-      v_worldPos[0] > u_renderExtent[2] ||
-      v_worldPos[1] > u_renderExtent[3]
+      worldPos[0] < u_renderExtent[0] ||
+      worldPos[1] < u_renderExtent[1] ||
+      worldPos[0] > u_renderExtent[2] ||
+      worldPos[1] > u_renderExtent[3]
     )
   ) {
     discard;
@@ -918,7 +954,7 @@ void main(void) {
   gl_FragColor = ${this.fillColorExpression_} * u_globalAlpha;
   if (u_hitDetection > 0) {
     if (gl_FragColor.a < 0.1) { discard; };
-    gl_FragColor = v_hitColor;
+    gl_FragColor = v_prop_hitColor;
   }
 }`;
   }

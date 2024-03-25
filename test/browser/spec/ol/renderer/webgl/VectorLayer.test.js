@@ -1,4 +1,3 @@
-import {} from '../../../../../../src/ol/math.js';
 import Feature from '../../../../../../src/ol/Feature.js';
 import LineString from '../../../../../../src/ol/geom/LineString.js';
 import Map from '../../../../../../src/ol/Map.js';
@@ -15,7 +14,11 @@ import {
   Projection,
   get as getProjection,
 } from '../../../../../../src/ol/proj.js';
-import {create} from '../../../../../../src/ol/transform.js';
+import {ShaderBuilder} from '../../../../../../src/ol/webgl/ShaderBuilder.js';
+import {
+  compose as composeTransform,
+  create as createTransform,
+} from '../../../../../../src/ol/transform.js';
 import {getUid} from '../../../../../../src/ol/util.js';
 
 const SAMPLE_STYLE = {
@@ -29,28 +32,11 @@ const SAMPLE_STYLE2 = {
   'circle-fill-color': 'red',
 };
 
-const SAMPLE_VERTEX_SHADER = `
-void main(void) {
-  gl_Position = vec4(1.0);
-}`;
-const SAMPLE_FRAGMENT_SHADER = `
-void main(void) {
-  gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-}`;
-
 const SAMPLE_SHADERS = {
-  fill: {
-    fragment: SAMPLE_FRAGMENT_SHADER,
-    vertex: SAMPLE_VERTEX_SHADER,
-  },
-  stroke: {
-    fragment: SAMPLE_FRAGMENT_SHADER,
-    vertex: SAMPLE_VERTEX_SHADER,
-  },
-  symbol: {
-    fragment: SAMPLE_FRAGMENT_SHADER,
-    vertex: SAMPLE_VERTEX_SHADER,
-  },
+  builder: new ShaderBuilder()
+    .setFillColorExpression('vec4(1.0)')
+    .setStrokeColorExpression('vec4(1.0)')
+    .setSymbolColorExpression('vec4(1.0)'),
   attributes: {
     attr1: {
       callback: () => 456,
@@ -61,7 +47,7 @@ const SAMPLE_SHADERS = {
   },
 };
 
-describe('ol/renderer/webgl/VectorLayer', function () {
+describe('ol/renderer/webgl/VectorLayer', () => {
   /** @type {import("../../../../../../src/ol/renderer/webgl/VectorLayer.js").default} */
   let renderer;
   /** @type {VectorLayer} */
@@ -80,7 +66,7 @@ describe('ol/renderer/webgl/VectorLayer', function () {
   /** @type {Feature} */
   let feature3;
 
-  beforeEach(function () {
+  beforeEach(() => {
     feature1 = new Feature({id: '01', geometry: new Point([1, 2])});
     feature2 = new Feature({
       id: '02',
@@ -120,9 +106,10 @@ describe('ol/renderer/webgl/VectorLayer', function () {
     frameState = {
       layerStatesArray: [vectorLayer.getLayerState()],
       layerIndex: 0,
-      extent: [-31, 1, 31, 31],
+      extent: [-32, 0, 32, 32],
       pixelRatio: 1,
-      pixelToCoordinateTransform: create(),
+      coordinateToPixelTransform: createTransform(),
+      pixelToCoordinateTransform: createTransform(),
       postRenderFunctions: [],
       time: Date.now(),
       viewHints: [],
@@ -142,17 +129,17 @@ describe('ol/renderer/webgl/VectorLayer', function () {
     vectorLayer.set('map', map, true);
   });
 
-  afterEach(function () {
+  afterEach(() => {
     vectorLayer.dispose();
     renderer.dispose();
     map.dispose();
   });
 
-  it('creates a new instance', function () {
+  it('creates a new instance', () => {
     expect(renderer).to.be.a(WebGLVectorLayerRenderer);
   });
 
-  it('do not create renderers initially', function () {
+  it('do not create renderers initially', () => {
     expect(renderer.styleRenderers_).to.eql([]);
   });
 
@@ -211,6 +198,9 @@ describe('ol/renderer/webgl/VectorLayer', function () {
 
   describe('source changes', () => {
     beforeEach(() => {
+      // first call prepareFrame to load initial data
+      renderer.prepareFrame(frameState);
+
       sinon.spy(renderer.batch_, 'addFeature');
       sinon.spy(renderer.batch_, 'removeFeature');
       sinon.spy(renderer.batch_, 'changeFeature');
@@ -220,7 +210,7 @@ describe('ol/renderer/webgl/VectorLayer', function () {
       it('batch contains all features', () => {
         const polygonIds = Object.keys(renderer.batch_.polygonBatch.entries);
         const lineStringIds = Object.keys(
-          renderer.batch_.lineStringBatch.entries
+          renderer.batch_.lineStringBatch.entries,
         );
         const pointIds = Object.keys(renderer.batch_.pointBatch.entries);
         expect(polygonIds).to.eql([getUid(feature2)]);
@@ -305,6 +295,8 @@ describe('ol/renderer/webgl/VectorLayer', function () {
   });
 
   describe('#renderFrame', () => {
+    const withHit = 2;
+
     beforeEach(async () => {
       // call once without tracking in order to initialize helper
       renderer.prepareFrame(frameState);
@@ -313,6 +305,7 @@ describe('ol/renderer/webgl/VectorLayer', function () {
       await new Promise((resolve) => setTimeout(resolve, 150));
 
       sinon.spy(renderer.helper, 'setUniformFloatValue');
+      sinon.spy(renderer.helper, 'setUniformFloatVec2');
       sinon.spy(renderer.helper, 'setUniformFloatVec4');
       sinon.spy(renderer.helper, 'setUniformMatrixValue');
       sinon.spy(renderer.helper, 'prepareDraw');
@@ -328,7 +321,7 @@ describe('ol/renderer/webgl/VectorLayer', function () {
           apply(target, thisArg, [uniform, value]) {
             return target.call(thisArg, uniform, [...value]);
           },
-        }
+        },
       );
 
       renderer.renderFrame({
@@ -345,7 +338,7 @@ describe('ol/renderer/webgl/VectorLayer', function () {
       const calls = renderer.helper.setUniformMatrixValue
         .getCalls()
         .filter((c) => c.args[0] === 'u_projectionMatrix');
-      expect(calls.length).to.be(6);
+      expect(calls.length).to.be(6 * withHit);
       expect(calls[0].args).to.eql([
         'u_projectionMatrix',
         // 0.5   0     0     0      combination of:
@@ -360,7 +353,7 @@ describe('ol/renderer/webgl/VectorLayer', function () {
       const calls = renderer.helper.setUniformMatrixValue
         .getCalls()
         .filter((c) => c.args[0] === 'u_screenToWorldMatrix');
-      expect(calls.length).to.be(6);
+      expect(calls.length).to.be(6 * withHit);
       expect(calls[1].args).to.eql([
         'u_screenToWorldMatrix',
         // 2     0     0     0      invert of u_projectionMatrix
@@ -370,9 +363,22 @@ describe('ol/renderer/webgl/VectorLayer', function () {
         [2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0.64, -1.28, 0, 1],
       ]);
     });
+    it('sets PATTERN_ORIGIN vec2 uniform once for each geometry type', () => {
+      const calls = renderer.helper.setUniformFloatVec2
+        .getCalls()
+        .filter((c) => c.args[0] === 'u_patternOrigin');
+      expect(calls.length).to.be(6 * withHit);
+      expect(calls[1].args).to.eql([
+        'u_patternOrigin',
+        // combination of:
+        //   [ 0, 16 ]  ->  initial view center
+        //   scale( 2 / (0.25 * 200px), 2 / (0.25 * 100px) )  ->  divide by initial resolution & viewport size
+        [0, -1.28],
+      ]);
+    });
     it('calls render once for each renderer', () => {
-      expect(renderer.styleRenderers_[0].render.callCount).to.be(1);
-      expect(renderer.styleRenderers_[1].render.callCount).to.be(1);
+      expect(renderer.styleRenderers_[0].render.callCount).to.be(1 * withHit);
+      expect(renderer.styleRenderers_[1].render.callCount).to.be(1 * withHit);
     });
     it('calls helper.prepareDraw once', () => {
       expect(renderer.helper.prepareDraw.calledOnce).to.eql(true);
@@ -401,33 +407,133 @@ describe('ol/renderer/webgl/VectorLayer', function () {
         renderer.renderFrame(frameState);
       });
       it('calls render three times for each renderer', () => {
-        expect(renderer.styleRenderers_[0].render.callCount).to.be(3);
-        expect(renderer.styleRenderers_[1].render.callCount).to.be(3);
+        expect(renderer.styleRenderers_[0].render.callCount).to.be(3 * withHit);
+        expect(renderer.styleRenderers_[1].render.callCount).to.be(3 * withHit);
+      });
+    });
+  });
+
+  describe('#forEachFeatureAtCoordinate', () => {
+    let topLeftSquare;
+    let centerPoint;
+    let diagonalLine;
+
+    beforeEach(() => {
+      topLeftSquare = new Feature({
+        id: 'topLeftSquare',
+        geometry: new Polygon([
+          [
+            [-25, 21],
+            [5, 21],
+            [5, 41],
+            [-25, 41],
+            [-25, 21],
+          ],
+        ]),
+      });
+      diagonalLine = new Feature({
+        id: 'diagonalLine',
+        geometry: new LineString([
+          [-25, 0],
+          [25, 25],
+        ]),
+      });
+      centerPoint = new Feature({
+        id: 'centerPoint',
+        geometry: new Point([0, 16]),
+      });
+      vectorSource.clear();
+      vectorSource.addFeatures([topLeftSquare, diagonalLine, centerPoint]);
+      vectorLayer = new VectorLayer({
+        source: vectorSource,
+      });
+      renderer = new WebGLVectorLayerRenderer(vectorLayer, {
+        style: [
+          {
+            'fill-color': 'red',
+            'stroke-color': 'orange',
+            'stroke-width': 5,
+            'circle-radius': 40,
+            'circle-fill-color': 'blue',
+          },
+        ],
+      });
+      const transform = composeTransform(
+        createTransform(),
+        100, // frameState.size[0] / 2,
+        50, // frameState.size[1] / 2,
+        4, // 1 / viewState.resolution,
+        -4, // -1 / viewState.resolution,
+        0, // -viewState.rotation,
+        0, // -viewState.center[0],
+        -16, // -viewState.center[1]
+      );
+      frameState = {
+        ...frameState,
+        coordinateToPixelTransform: transform,
+      };
+    });
+    it('correctly hit detects features', (done) => {
+      function checkHit(x, y, expected) {
+        const spy = sinon.spy();
+        renderer.forEachFeatureAtCoordinate([x, y], frameState, 0, spy, []);
+        const called = spy.callCount;
+        const found = spy.getCall(0)?.args[0];
+        if (expected) {
+          if (!called) {
+            done(new Error('no feature found, expected one'));
+          }
+          if (found && found !== expected) {
+            done(
+              new Error(
+                `feature found id=${found.get(
+                  'id',
+                )}, does not match expected id=${expected.get('id')}`,
+              ),
+            );
+          }
+        } else if (called) {
+          done(new Error('found a feature, expected none'));
+        }
+      }
+
+      renderer.prepareFrame(frameState);
+      // this will trigger when the rendering buffers are ready
+      vectorLayer.once('change', () => {
+        renderer.renderFrame(frameState);
+        checkHit(0, 16, centerPoint);
+        checkHit(-15, 25, topLeftSquare);
+        checkHit(15, 20, diagonalLine);
+        checkHit(-15, 5, diagonalLine);
+        checkHit(20, 5, null);
+        done();
       });
     });
   });
 
   describe('#dispose', () => {
     beforeEach(() => {
+      // first call prepareFrame to load initial data and register listeners
+      renderer.prepareFrame(frameState);
       sinon.spy(vectorSource, 'removeEventListener');
       renderer.dispose();
     });
     it('unlistens to source events', () => {
       expect(
-        vectorSource.removeEventListener.calledWith(VectorEventType.ADDFEATURE)
+        vectorSource.removeEventListener.calledWith(VectorEventType.ADDFEATURE),
       ).to.be(true);
       expect(
         vectorSource.removeEventListener.calledWith(
-          VectorEventType.CHANGEFEATURE
-        )
+          VectorEventType.CHANGEFEATURE,
+        ),
       ).to.be(true);
       expect(
         vectorSource.removeEventListener.calledWith(
-          VectorEventType.REMOVEFEATURE
-        )
+          VectorEventType.REMOVEFEATURE,
+        ),
       ).to.be(true);
       expect(
-        vectorSource.removeEventListener.calledWith(VectorEventType.CLEAR)
+        vectorSource.removeEventListener.calledWith(VectorEventType.CLEAR),
       ).to.be(true);
     });
   });

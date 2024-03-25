@@ -29,7 +29,7 @@ const SAMPLE_TRANSFORM = composeTransform(
   2 / (SAMPLE_FRAMESTATE.viewState.resolution * SAMPLE_FRAMESTATE.size[1]),
   -SAMPLE_FRAMESTATE.viewState.rotation,
   -SAMPLE_FRAMESTATE.viewState.center[0],
-  -SAMPLE_FRAMESTATE.viewState.center[1]
+  -SAMPLE_FRAMESTATE.viewState.center[1],
 );
 
 describe('Render instructions utilities', function () {
@@ -98,7 +98,7 @@ describe('Render instructions utilities', function () {
         mixedBatch.pointBatch,
         new Float32Array(0),
         customAttributes,
-        SAMPLE_TRANSFORM
+        SAMPLE_TRANSFORM,
       );
     });
     it('generates render instructions', function () {
@@ -114,7 +114,7 @@ describe('Render instructions utilities', function () {
         mixedBatch.lineStringBatch,
         new Float32Array(0),
         customAttributes,
-        SAMPLE_TRANSFORM
+        SAMPLE_TRANSFORM,
       );
     });
     it('generates render instructions', function () {
@@ -131,12 +131,36 @@ describe('Render instructions utilities', function () {
         mixedBatch.polygonBatch,
         new Float32Array(0),
         customAttributes,
-        SAMPLE_TRANSFORM
+        SAMPLE_TRANSFORM,
       );
     });
     it('generates render instructions', function () {
       expect(Array.from(renderInstructions)).to.eql([
         3000, 66, 77, 88, 1, 5, 2, 0, 4, 0, 6, 2, 4, 6, 2, 0,
+      ]);
+    });
+  });
+
+  describe('custom attribute returning an array', () => {
+    beforeEach(function () {
+      renderInstructions = generatePointRenderInstructions(
+        mixedBatch.pointBatch,
+        new Float32Array(0),
+        [
+          {
+            name: 'test',
+            size: 4,
+            callback: function () {
+              return [0, 1, 2, 3];
+            },
+          },
+        ],
+        SAMPLE_TRANSFORM,
+      );
+    });
+    it('generates render instructions', function () {
+      expect(Array.from(renderInstructions)).to.eql([
+        2, 2, 0, 1, 2, 3, 6, 6, 0, 1, 2, 3,
       ]);
     });
   });
