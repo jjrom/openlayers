@@ -170,6 +170,8 @@ const DIMENSION_PARSERS = makeStructureNS(
   },
   makeStructureNS(OWS_NAMESPACE_URIS, {
     'Identifier': makeObjectPropertySetter(readString),
+    // [rocket] Read ows:UOM
+    'UOM':makeObjectPropertySetter(readString)
   }),
 );
 
