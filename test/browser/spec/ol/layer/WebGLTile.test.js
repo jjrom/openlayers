@@ -1,6 +1,5 @@
 import DataTileSource from '../../../../../src/ol/source/DataTile.js';
 import Map from '../../../../../src/ol/Map.js';
-import OSM from '../../../../../src/ol/source/OSM.js';
 import TileWMS from '../../../../../src/ol/source/TileWMS.js';
 import View from '../../../../../src/ol/View.js';
 import WebGLHelper from '../../../../../src/ol/webgl/Helper.js';
@@ -52,8 +51,7 @@ describe('ol/layer/WebGLTile', function () {
   });
 
   afterEach(function () {
-    map.setTarget(null);
-    document.body.removeChild(target);
+    disposeMap(map);
     map.getLayers().forEach((layer) => layer.dispose());
   });
 
@@ -77,8 +75,7 @@ describe('ol/layer/WebGLTile', function () {
     });
 
     afterEach(() => {
-      map.setTarget(null);
-      document.body.removeChild(target);
+      disposeMap(map);
     });
 
     it('retrieves pixel data', (done) => {
@@ -222,8 +219,7 @@ describe('ol/layer/WebGLTile', function () {
     });
 
     afterEach(() => {
-      map.setTarget(null);
-      document.body.removeChild(target);
+      disposeMap(map);
     });
 
     it('gets pixel data', () => {
@@ -267,19 +263,6 @@ describe('ol/layer/WebGLTile', function () {
       const spy = sinon.spy(renderer, 'dispose');
       layer.dispose();
       expect(spy.called).to.be(true);
-    });
-  });
-
-  describe('caching', () => {
-    it('updates the size of the tile cache on the source ', (done) => {
-      const source = new OSM();
-      const spy = sinon.spy(source, 'updateCacheSize');
-      const layer = new WebGLTileLayer({source: source});
-      map.addLayer(layer);
-      map.once('rendercomplete', () => {
-        expect(spy.called).to.be(true);
-        done();
-      });
     });
   });
 
@@ -631,17 +614,6 @@ describe('ol/layer/WebGLTile', function () {
     });
 
     map.render();
-  });
-
-  it('tries to expire the source tile cache', (done) => {
-    const source = layer.getSource();
-    const expire = sinon.spy(source, 'expireCache');
-
-    layer.updateStyleVariables({r: 1, g: 2, b: 3});
-    map.once('rendercomplete', () => {
-      expect(expire.called).to.be(true);
-      done();
-    });
   });
 
   it('throws on incorrect style configs', function () {

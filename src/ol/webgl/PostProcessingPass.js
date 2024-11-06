@@ -6,13 +6,13 @@ import {getUid} from '../util.js';
 
 const DEFAULT_VERTEX_SHADER = `
   precision mediump float;
-  
+
   attribute vec2 a_position;
   varying vec2 v_texCoord;
   varying vec2 v_screenCoord;
-  
+
   uniform vec2 u_screenSize;
-   
+
   void main() {
     v_texCoord = a_position * 0.5 + 0.5;
     v_screenCoord = v_texCoord * u_screenSize;
@@ -22,12 +22,12 @@ const DEFAULT_VERTEX_SHADER = `
 
 const DEFAULT_FRAGMENT_SHADER = `
   precision mediump float;
-   
+
   uniform sampler2D u_image;
   uniform float u_opacity;
-   
+
   varying vec2 v_texCoord;
-   
+
   void main() {
     gl_FragColor = texture2D(u_image, v_texCoord) * u_opacity;
   }
@@ -103,15 +103,36 @@ class WebGLPostProcessingPass {
    * @param {Options} options Options.
    */
   constructor(options) {
+    /**
+     * @private
+     */
     this.gl_ = options.webGlContext;
     const gl = this.gl_;
 
+    /**
+     * @private
+     */
     this.scaleRatio_ = options.scaleRatio || 1;
 
+    /**
+     * @type {WebGLTexture}
+     * @private
+     */
     this.renderTargetTexture_ = gl.createTexture();
+
+    /**
+     * @type {import('../size.js').Size|null}
+     * @private
+     */
     this.renderTargetTextureSize_ = null;
 
+    /**
+     * @private
+     */
     this.frameBuffer_ = gl.createFramebuffer();
+    /**
+     * @private
+     */
     this.depthBuffer_ = gl.createRenderbuffer();
 
     // compile the program for the frame buffer
@@ -128,12 +149,18 @@ class WebGLPostProcessingPass {
       options.fragmentShader || DEFAULT_FRAGMENT_SHADER,
     );
     gl.compileShader(fragmentShader);
+    /**
+     * @private
+     */
     this.renderTargetProgram_ = gl.createProgram();
     gl.attachShader(this.renderTargetProgram_, vertexShader);
     gl.attachShader(this.renderTargetProgram_, fragmentShader);
     gl.linkProgram(this.renderTargetProgram_);
 
     // bind the vertices buffer for the frame buffer
+    /**
+     * @private
+     */
     this.renderTargetVerticesBuffer_ = gl.createBuffer();
     const verticesArray = [-1, -1, 1, -1, -1, 1, 1, -1, 1, 1, -1, 1];
     gl.bindBuffer(gl.ARRAY_BUFFER, this.renderTargetVerticesBuffer_);
@@ -143,18 +170,30 @@ class WebGLPostProcessingPass {
       gl.STATIC_DRAW,
     );
 
+    /**
+     * @private
+     */
     this.renderTargetAttribLocation_ = gl.getAttribLocation(
       this.renderTargetProgram_,
       'a_position',
     );
+    /**
+     * @private
+     */
     this.renderTargetUniformLocation_ = gl.getUniformLocation(
       this.renderTargetProgram_,
       'u_screenSize',
     );
+    /**
+     * @private
+     */
     this.renderTargetOpacityLocation_ = gl.getUniformLocation(
       this.renderTargetProgram_,
       'u_opacity',
     );
+    /**
+     * @private
+     */
     this.renderTargetTextureLocation_ = gl.getUniformLocation(
       this.renderTargetProgram_,
       'u_image',
@@ -173,6 +212,10 @@ class WebGLPostProcessingPass {
           location: gl.getUniformLocation(this.renderTargetProgram_, name),
         });
       });
+  }
+
+  getRenderTargetTexture() {
+    return this.renderTargetTexture_;
   }
 
   /**

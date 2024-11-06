@@ -1,5 +1,53 @@
 ## Upgrade notes
 
+### 10.2.0
+
+No changes should be needed to update to this release.  See the release changelog for new features and fixes.
+
+### 10.1.0
+
+No changes should be needed to update to this release.  See the release changelog for new features and fixes.
+
+### 10.0.0
+
+#### Backwards incompatible changes
+
+##### `ol/source/VectorTile`: `getFeaturesInExtent()` method moved to `ol/layer/VectorTile`
+
+The `getFeaturesInExtent()` method of `ol/source/VectorTile` has been moved to `ol/layer/VectorTile`. The signature and behavior have not changed, so all that needs to be done is change code from e.g.
+```js
+layer.getSource().getFeaturesInExtent(extent);
+```
+to
+```js
+layer.getFeaturesInExtent(extent);
+```
+
+##### Flat styles: Removal of Type hints in `'get'` expressions
+
+For the Canvas renderer, additional arguments to the `'get'` call expression now mean access to nested properties or array items. The expression system has been improved so type hints are no longer needed. If you were previously using a type hint in a `get` expression, you have to change the expression from e.g.
+```js
+['get', 'foo', 'number[]']
+```
+to
+```js
+['get', 'foo']
+```
+
+#### Other changes
+
+##### Removal of the `opaque` option from all `Tile` sources
+
+The `opaque` option was previously used to hint the renderer to perform some optimizations on layers known to be fully opaque. This is no longer needed, and the option has been removed.
+
+### 9.2.0
+
+#### The `snap` event's feature property is now never `null`
+
+Previously, listeners for the `Snap` interaction's `snap` event received `null` as value for the `feature` property when snapped to a segment. Now, the value of the `feature` property is always set to the snapped feature.
+
+To distinguish between a vertex and a segment snap, look at the `snap` event's `segment` property. It will set to `null` on a vertex snap, and to the snapped segment on a segment snap.
+
 ### 9.1.0
 
 No special changes are required when upgrading to the 9.1.0 release.

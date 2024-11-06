@@ -12,12 +12,19 @@ import {
 } from 'geotiff';
 import {
   Projection,
+  createTransformFromCoordinateTransform,
   get as getCachedProjection,
   toUserCoordinate,
   toUserExtent,
 } from '../proj.js';
+import {
+  apply as applyMatrix,
+  create as createMatrix,
+  makeInverse,
+  multiply as multiplyTransform,
+} from '../transform.js';
+import {applyTransform, getCenter, getIntersection} from '../extent.js';
 import {clamp} from '../math.js';
-import {getCenter, getIntersection} from '../extent.js';
 import {error as logError} from '../console.js';
 import {fromCode as unitsFromCode} from '../proj/Units.js';
 
@@ -131,7 +138,7 @@ function getWorkerPool() {
  */
 function getBoundingBox(image) {
   try {
-    return image.getBoundingBox();
+    return image.getBoundingBox(true);
   } catch (_) {
     return [0, 0, image.getWidth(), image.getHeight()];
   }
@@ -358,7 +365,6 @@ function getMaxForDataType(array) {
  * 0 and 1 with scaling factors based on the raster statistics or `min` and `max` properties of each source.
  * If instead you want to work with the raw values in a style expression, set this to `false`.  Setting this option
  * to `false` will make it so any `min` and `max` properties on sources are ignored.
- * @property {boolean} [opaque=false] Whether the layer is opaque.
  * @property {import("../proj.js").ProjectionLike} [projection] Source projection.  If not provided, the GeoTIFF metadata
  * will be read for projection information.
  * @property {number} [transition=250] Duration of the opacity transition for rendering.
@@ -385,7 +391,6 @@ class GeoTIFFSource extends DataTile {
       state: 'loading',
       tileGrid: null,
       projection: options.projection || null,
-      opaque: options.opaque,
       transition: options.transition,
       interpolate: options.interpolate !== false,
       wrapX: options.wrapX,
@@ -461,6 +466,7 @@ class GeoTIFFSource extends DataTile {
 
     /**
      * @type {true|false|'auto'}
+     * @private
      */
     this.convertToRGB_ = options.convertToRGB || false;
 
@@ -517,6 +523,41 @@ class GeoTIFFSource extends DataTile {
       const projection = getProjection(image);
       if (projection) {
         this.projection = projection;
+        break;
+      }
+    }
+  }
+
+  /**
+   * Determine any transform matrix for the images in this GeoTIFF.
+   *
+   * @param {Array<Array<GeoTIFFImage>>} sources Each source is a list of images
+   * from a single GeoTIFF.
+   */
+  determineTransformMatrix(sources) {
+    const firstSource = sources[0];
+    for (let i = firstSource.length - 1; i >= 0; --i) {
+      const image = firstSource[i];
+      const modelTransformation = image.fileDirectory.ModelTransformation;
+      if (modelTransformation) {
+        // eslint-disable-next-line no-unused-vars
+        const [a, b, c, d, e, f, g, h] = modelTransformation;
+        const matrix = multiplyTransform(
+          multiplyTransform(
+            [
+              1 / Math.sqrt(a * a + e * e),
+              0,
+              0,
+              -1 / Math.sqrt(b * b + f * f),
+              d,
+              h,
+            ],
+            [a, e, b, f, 0, 0],
+          ),
+          [1, 0, 0, 1, -d, -h],
+        );
+        this.transformMatrix = matrix;
+        this.addAlpha_ = true;
         break;
       }
     }
@@ -686,6 +727,7 @@ class GeoTIFFSource extends DataTile {
     if (!this.getProjection()) {
       this.determineProjection(sources);
     }
+    this.determineTransformMatrix(sources);
 
     this.samplesPerPixel_ = samplesPerPixel;
     this.nodataValues_ = nodataValues;
@@ -753,12 +795,21 @@ class GeoTIFFSource extends DataTile {
       resolutions = [resolutions[0] * 2, resolutions[0], resolutions[0] / 2];
     }
 
+    let viewExtent = extent;
+    if (this.transformMatrix) {
+      const matrix = makeInverse(createMatrix(), this.transformMatrix.slice());
+      const transformFn = createTransformFromCoordinateTransform((input) =>
+        applyMatrix(matrix, input),
+      );
+      viewExtent = applyTransform(extent, transformFn);
+    }
+
     this.viewResolver({
       showFullExtent: true,
       projection: this.projection,
       resolutions: resolutions,
-      center: toUserCoordinate(getCenter(extent), this.projection),
-      extent: toUserExtent(extent, this.projection),
+      center: toUserCoordinate(getCenter(viewExtent), this.projection),
+      extent: toUserExtent(viewExtent, this.projection),
       zoom: zoom,
     });
   }
@@ -767,10 +818,11 @@ class GeoTIFFSource extends DataTile {
    * @param {number} z The z tile index.
    * @param {number} x The x tile index.
    * @param {number} y The y tile index.
+   * @param {import('./DataTile.js').LoaderOptions} options The loader options.
    * @return {Promise} The composed tile data.
    * @private
    */
-  loadTile_(z, x, y) {
+  loadTile_(z, x, y, options) {
     const sourceTileSize = this.getTileSize(z);
     const sourceCount = this.sourceImagery_.length;
     const requests = new Array(sourceCount * 2);
@@ -816,6 +868,7 @@ class GeoTIFFSource extends DataTile {
         fillValue: fillValue,
         pool: pool,
         interleave: false,
+        signal: options.signal,
       };
       if (readRGB(this.convertToRGB_, image)) {
         requests[sourceIndex] = image.readRGB(readOptions);

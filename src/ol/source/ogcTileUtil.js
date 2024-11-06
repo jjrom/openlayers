@@ -6,6 +6,7 @@ import TileGrid from '../tilegrid/TileGrid.js';
 import {getJSON, resolveUrl} from '../net.js';
 import {get as getProjection} from '../proj.js';
 import {getIntersection as intersectExtents} from '../extent.js';
+import {error as logError} from '../console.js';
 
 /**
  * See https://ogcapi.ogc.org/tiles/.
@@ -47,9 +48,24 @@ import {getIntersection as intersectExtents} from '../extent.js';
 /**
  * @typedef {Object} TileMatrixSet
  * @property {string} id The tile matrix set identifier.
- * @property {string} crs The coordinate reference system.
+ * @property {string|CrsUri|CrsWkt|CrsReferenceSystem} crs The coordinate reference system.
  * @property {Array<string>} [orderedAxes] Axis order.
  * @property {Array<TileMatrix>} tileMatrices Array of tile matrices.
+ */
+
+/**
+ * @typedef {Object} CrsUri
+ * @property {string} uri Reference to one coordinate reference system (CRS).
+ */
+
+/**
+ * @typedef {Object} CrsWkt
+ * @property {Object} wkt JSON encoding for WKT representation of CRS 2.0.
+ */
+
+/**
+ * @typedef {Object} CrsReferenceSystem
+ * @property {Object} referenceSystem Data structure as defined in the MD_ReferenceSystem of the ISO 19115.
  */
 
 /**
@@ -85,6 +101,7 @@ const knownVectorMediaTypes = {
 /**
  * @typedef {Object} TileSetInfo
  * @property {string} urlTemplate The tile URL template.
+ * @property {import("../proj/Projection.js").default} projection The source projection.
  * @property {import("../tilegrid/TileGrid.js").default} grid The tile grid.
  * @property {import("../Tile.js").UrlFunction} urlFunction The tile URL function.
  */
@@ -96,14 +113,50 @@ const knownVectorMediaTypes = {
  * @property {Array<string>} [supportedMediaTypes] The supported media types.
  * @property {import("../proj/Projection.js").default} projection The source projection.
  * @property {Object} [context] Optional context for constructing the URL.
+ * @property {Array<string>} [collections] Optional collections to append the URL with.
  */
+
+/**
+ * @param {string} tileUrlTemplate Tile URL template.
+ * @param {Array<string>} collections List of collections to include as query parameter.
+ * @return {string} The tile URL template with appended collections query parameter.
+ */
+export function appendCollectionsQueryParam(tileUrlTemplate, collections) {
+  if (!collections.length) {
+    return tileUrlTemplate;
+  }
+
+  // making sure we can always construct a URL instance.
+  const url = new URL(tileUrlTemplate, 'file:/');
+
+  if (url.pathname.split('/').includes('collections')) {
+    logError(
+      'The "collections" query parameter cannot be added to collection endpoints',
+    );
+    return tileUrlTemplate;
+  }
+  // According to conformance class
+  // http://www.opengis.net/spec/ogcapi-tiles-1/1.0/conf/collections-selection
+  // commata in the identifiers of the `collections` query parameter
+  // need to be URLEncoded, while the commata separating the identifiers
+  // should not.
+  const encodedCollections = collections
+    .map((c) => encodeURIComponent(c))
+    .join(',');
+
+  url.searchParams.append('collections', encodedCollections);
+  const baseUrl = tileUrlTemplate.split('?')[0];
+  const queryParams = decodeURIComponent(url.searchParams.toString());
+  return `${baseUrl}?${queryParams}`;
+}
 
 /**
  * @param {Array<Link>} links Tileset links.
  * @param {string} [mediaType] The preferred media type.
+ * @param {Array<string>} [collections] Optional collections to append the URL with.
  * @return {string} The tile URL template.
  */
-export function getMapTileUrlTemplate(links, mediaType) {
+export function getMapTileUrlTemplate(links, mediaType, collections) {
   let tileUrlTemplate;
   let fallbackUrlTemplate;
   for (let i = 0; i < links.length; ++i) {
@@ -129,6 +182,10 @@ export function getMapTileUrlTemplate(links, mediaType) {
     }
   }
 
+  if (collections) {
+    tileUrlTemplate = appendCollectionsQueryParam(tileUrlTemplate, collections);
+  }
+
   return tileUrlTemplate;
 }
 
@@ -136,12 +193,14 @@ export function getMapTileUrlTemplate(links, mediaType) {
  * @param {Array<Link>} links Tileset links.
  * @param {string} [mediaType] The preferred media type.
  * @param {Array<string>} [supportedMediaTypes] The media types supported by the parser.
+ * @param {Array<string>} [collections] Optional collections to append the URL with.
  * @return {string} The tile URL template.
  */
 export function getVectorTileUrlTemplate(
   links,
   mediaType,
   supportedMediaTypes,
+  collections,
 ) {
   let tileUrlTemplate;
   let fallbackUrlTemplate;
@@ -184,6 +243,10 @@ export function getVectorTileUrlTemplate(
     }
   }
 
+  if (collections) {
+    tileUrlTemplate = appendCollectionsQueryParam(tileUrlTemplate, collections);
+  }
+
   return tileUrlTemplate;
 }
 
@@ -202,19 +265,23 @@ function parseTileMatrixSet(
 ) {
   let projection = sourceInfo.projection;
   if (!projection) {
-    projection = getProjection(tileMatrixSet.crs);
+    if (typeof tileMatrixSet.crs === 'string') {
+      projection = getProjection(tileMatrixSet.crs);
+    } else if ('uri' in tileMatrixSet.crs) {
+      projection = getProjection(tileMatrixSet.crs.uri);
+    }
     if (!projection) {
-      throw new Error(`Unsupported CRS: ${tileMatrixSet.crs}`);
+      throw new Error(`Unsupported CRS: ${JSON.stringify(tileMatrixSet.crs)}`);
     }
   }
   const orderedAxes = tileMatrixSet.orderedAxes;
-  const backwards =
-    (orderedAxes
-      ? orderedAxes
-          .slice(0, 2)
-          .map((s) => s.replace(/E|X|Lon/i, 'e').replace(/N|Y|Lat/i, 'n'))
-          .join('')
-      : projection.getAxisOrientation().substr(0, 2)) !== 'en';
+  const axisOrientation = orderedAxes
+    ? orderedAxes
+        .slice(0, 2)
+        .map((s) => s.replace(/E|X|Lon/i, 'e').replace(/N|Y|Lat/i, 'n'))
+        .join('')
+    : projection.getAxisOrientation();
+  const backwards = !axisOrientation.startsWith('en');
 
   const matrices = tileMatrixSet.tileMatrices;
 
@@ -343,6 +410,7 @@ function parseTileMatrixSet(
 
   return {
     grid: tileGrid,
+    projection: projection,
     urlTemplate: tileUrlTemplate,
     urlFunction: tileUrlFunction,
   };
@@ -362,12 +430,14 @@ function parseTileSetMetadata(sourceInfo, tileSet) {
     tileUrlTemplate = getMapTileUrlTemplate(
       tileSet.links,
       sourceInfo.mediaType,
+      sourceInfo.collections,
     );
   } else if (tileSet.dataType === 'vector') {
     tileUrlTemplate = getVectorTileUrlTemplate(
       tileSet.links,
       sourceInfo.mediaType,
       sourceInfo.supportedMediaTypes,
+      sourceInfo.collections,
     );
   } else {
     throw new Error('Expected tileset data type to be "map" or "vector"');

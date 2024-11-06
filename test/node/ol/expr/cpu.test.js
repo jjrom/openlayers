@@ -2,6 +2,7 @@ import expect from '../../expect.js';
 import {
   BooleanType,
   ColorType,
+  NumberArrayType,
   NumberType,
   StringType,
   newParsingContext,
@@ -27,6 +28,61 @@ describe('ol/expr/cpu.js', () => {
      * @type {Array<Case>}
      */
     const cases = [
+      {
+        name: 'get',
+        context: {
+          properties: {
+            property: 42,
+          },
+        },
+        expression: ['get', 'property'],
+        type: NumberType,
+        expected: 42,
+      },
+      {
+        name: 'get (nested)',
+        context: {
+          properties: {
+            deeply: {nested: {property: 42}},
+          },
+        },
+        expression: ['get', 'deeply', 'nested', 'property'],
+        type: NumberType,
+        expected: 42,
+      },
+      {
+        name: 'get number (excess key)',
+        context: {
+          properties: {
+            property: 42,
+          },
+        },
+        expression: ['get', 'property', 'nothing_here'],
+        type: NumberType,
+        expected: undefined,
+      },
+      {
+        name: 'get array item',
+        context: {
+          properties: {
+            values: [17, 42],
+          },
+        },
+        expression: ['get', 'values', 1],
+        type: NumberType,
+        expected: 42,
+      },
+      {
+        name: 'get array',
+        context: {
+          properties: {
+            values: [17, 42],
+          },
+        },
+        expression: ['get', 'values'],
+        type: NumberArrayType,
+        expected: [17, 42],
+      },
       {
         name: 'boolean literal (true)',
         type: BooleanType,
@@ -131,6 +187,12 @@ describe('ol/expr/cpu.js', () => {
           featureId: 'foo',
         },
         expected: 'Feature foo',
+      },
+      {
+        name: 'concat (with string and number)',
+        type: StringType,
+        expression: ['concat', 'number ', 1],
+        expected: 'number 1',
       },
       {
         name: 'coalesce (2 arguments, first has a value)',
@@ -622,13 +684,13 @@ describe('ol/expr/cpu.js', () => {
         expected: 'true',
       },
       {
-        name: 'to-string (color)',
+        name: 'to-string (array)',
         type: StringType,
-        expression: ['to-string', ['get', 'fill', 'color']],
+        expression: ['to-string', ['get', 'fill']],
         context: {
           properties: {fill: [0, 255, 0]},
         },
-        expected: 'rgba(0,255,0,1)',
+        expected: '0,255,0',
       },
       {
         name: 'in (true)',
@@ -652,6 +714,94 @@ describe('ol/expr/cpu.js', () => {
         name: 'between (false)',
         type: BooleanType,
         expression: ['between', 3, 4, 5],
+        expected: false,
+      },
+      {
+        name: 'has (true)',
+        context: {
+          properties: {
+            property: 42,
+          },
+        },
+        type: BooleanType,
+        expression: ['has', 'property'],
+        expected: true,
+      },
+      {
+        name: 'has (false)',
+        context: {
+          properties: {
+            property: 42,
+          },
+        },
+        type: BooleanType,
+        expression: ['has', 'notProperty'],
+        expected: false,
+      },
+      {
+        name: 'has (true - null)',
+        context: {
+          properties: {
+            property: null,
+          },
+        },
+        type: BooleanType,
+        expression: ['has', 'property'],
+        expected: true,
+      },
+      {
+        name: 'has (true - undefined)',
+        context: {
+          properties: {
+            property: undefined,
+          },
+        },
+        type: BooleanType,
+        expression: ['has', 'property'],
+        expected: true,
+      },
+      {
+        name: 'has (nested object true)',
+        context: {
+          properties: {
+            deeply: {nested: {property: true}},
+          },
+        },
+        type: BooleanType,
+        expression: ['has', 'deeply', 'nested', 'property'],
+        expected: true,
+      },
+      {
+        name: 'has (nested object false)',
+        context: {
+          properties: {
+            deeply: {nested: {property: true}},
+          },
+        },
+        type: BooleanType,
+        expression: ['has', 'deeply', 'not', 'property'],
+        expected: false,
+      },
+      {
+        name: 'has (nested array true)',
+        context: {
+          properties: {
+            property: [42, {foo: 'bar'}],
+          },
+        },
+        type: BooleanType,
+        expression: ['has', 'property', 1, 'foo'],
+        expected: true,
+      },
+      {
+        name: 'has (nested array false)',
+        context: {
+          properties: {
+            property: [42, {foo: 'bar'}],
+          },
+        },
+        type: BooleanType,
+        expression: ['has', 'property', 0, 'foo'],
         expected: false,
       },
     ];

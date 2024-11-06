@@ -39,7 +39,7 @@ describe('ol/renderer/canvas/VectorLayer', function () {
     });
 
     afterEach(function () {
-      document.body.removeChild(target);
+      target.remove();
     });
 
     it('creates a new instance', function () {
@@ -90,7 +90,8 @@ describe('ol/renderer/canvas/VectorLayer', function () {
       map.renderSync();
       expect(spy.getCall(0).args[2]).to.eql(layerStyle);
       expect(spy.getCall(1).args[2]).to.be(featureStyle);
-      document.body.removeChild(target);
+
+      disposeMap(map);
     });
 
     it('does not re-render for unavailable fonts', function (done) {
@@ -190,6 +191,38 @@ describe('ol/renderer/canvas/VectorLayer', function () {
           done(e);
         }
       }, 1600);
+    });
+  });
+
+  describe('numeric labels', function () {
+    let map;
+    this.beforeEach(function () {
+      map = new Map({
+        target: createMapDiv(100, 100),
+        view: new View({
+          center: [0, 0],
+          zoom: 0,
+        }),
+      });
+    });
+
+    this.afterEach(function () {
+      disposeMap(map);
+    });
+
+    it('supports numbers for texts', function () {
+      const layer = new VectorLayer({
+        source: new VectorSource({
+          features: [new Feature(new Point([0, 0]))],
+        }),
+        style: new Style({
+          text: new Text({
+            text: 5,
+          }),
+        }),
+      });
+      map.addLayer(layer);
+      expect(() => map.renderSync()).to.not.throwException();
     });
   });
 
@@ -412,6 +445,9 @@ describe('ol/renderer/canvas/VectorLayer', function () {
       expect(renderer.replayGroupChanged).to.be(true);
       renderer.prepareFrame(frameState);
       expect(renderer.replayGroupChanged).to.be(false);
+      frameState.declutter = {};
+      renderer.prepareFrame(frameState);
+      expect(renderer.replayGroupChanged).to.be(true);
     });
 
     it('dispatches a postrender event when rendering', function () {

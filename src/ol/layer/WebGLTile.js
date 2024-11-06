@@ -17,7 +17,7 @@ import {
 import {expressionToGlsl} from '../webgl/styleparser.js';
 
 /**
- * @typedef {import("../source/DataTile.js").default|import("../source/TileImage.js").default} SourceType
+ * @typedef {import("../source/DataTile.js").default<import("../DataTile.js").default|import("../ImageTile.js").default>} SourceType
  */
 
 /**
@@ -73,7 +73,7 @@ import {expressionToGlsl} from '../webgl/styleparser.js';
  * this layer in its layers collection, and the layer will be rendered on top. This is useful for
  * temporary layers. The standard way to add a layer to a map and have it managed by the map is to
  * use {@link module:ol/Map~Map#addLayer}.
- * @property {boolean} [useInterimTilesOnError=true] Use interim tiles on error.
+ * @property {boolean} [useInterimTilesOnError=true] Deprecated.  Use interim tiles on error.
  * @property {number} [cacheSize=512] The internal texture cache size.  This needs to be large enough to render
  * two zoom levels worth of tiles.
  * @property {Object<string, *>} [properties] Arbitrary observable properties. Can be accessed with `#get()` and `#set()`.
@@ -279,7 +279,8 @@ function parseStyle(style, bandCount) {
  * options means that `title` is observable, and has get/set accessors.
  *
  * @extends BaseTileLayer<SourceType, WebGLTileLayerRenderer>
- * @fires import("../render/Event.js").RenderEvent
+ * @fires import("../render/Event.js").RenderEvent#prerender
+ * @fires import("../render/Event.js").RenderEvent#postrender
  * @api
  */
 class WebGLTileLayer extends BaseTileLayer {
@@ -291,9 +292,6 @@ class WebGLTileLayer extends BaseTileLayer {
 
     const style = options.style || {};
     delete options.style;
-
-    const cacheSize = options.cacheSize;
-    delete options.cacheSize;
 
     super(options);
 
@@ -320,12 +318,6 @@ class WebGLTileLayer extends BaseTileLayer {
      * @private
      */
     this.style_ = style;
-
-    /**
-     * @type {number}
-     * @private
-     */
-    this.cacheSize_ = cacheSize;
 
     /**
      * @type {Object<string, (string|number)>}
@@ -355,6 +347,7 @@ class WebGLTileLayer extends BaseTileLayer {
 
   /**
    * @return {SourceType} The source being rendered.
+   * @override
    */
   getRenderSource() {
     return this.renderedSource_ || this.getSource();
@@ -362,6 +355,7 @@ class WebGLTileLayer extends BaseTileLayer {
 
   /**
    * @return {import("../source/Source.js").State} Source state.
+   * @override
    */
   getSourceState() {
     const source = this.getRenderSource();
@@ -375,8 +369,19 @@ class WebGLTileLayer extends BaseTileLayer {
     if (this.hasRenderer()) {
       this.getRenderer().clearCache();
     }
-    if (this.getSource()) {
-      this.setStyle(this.style_);
+    const source = this.getSource();
+    if (source) {
+      if (source.getState() === 'loading') {
+        const onChange = () => {
+          if (source.getState() === 'ready') {
+            source.removeEventListener('change', onChange);
+            this.setStyle(this.style_);
+          }
+        };
+        source.addEventListener('change', onChange);
+      } else {
+        this.setStyle(this.style_);
+      }
     }
   }
 
@@ -392,6 +397,9 @@ class WebGLTileLayer extends BaseTileLayer {
       : 4;
   }
 
+  /**
+   * @override
+   */
   createRenderer() {
     const parsedStyle = parseStyle(this.style_, this.getSourceBandCount_());
 
@@ -399,7 +407,7 @@ class WebGLTileLayer extends BaseTileLayer {
       vertexShader: parsedStyle.vertexShader,
       fragmentShader: parsedStyle.fragmentShader,
       uniforms: parsedStyle.uniforms,
-      cacheSize: this.cacheSize_,
+      cacheSize: this.getCacheSize(),
       paletteTextures: parsedStyle.paletteTextures,
     });
   }
@@ -426,6 +434,7 @@ class WebGLTileLayer extends BaseTileLayer {
    * @param {HTMLElement} target Target which the renderer may (but need not) use
    * for rendering its content.
    * @return {HTMLElement} The rendered element.
+   * @override
    */
   render(frameState, target) {
     this.rendered = true;
@@ -476,15 +485,17 @@ class WebGLTileLayer extends BaseTileLayer {
   setStyle(style) {
     this.styleVariables_ = style.variables || {};
     this.style_ = style;
-    const parsedStyle = parseStyle(this.style_, this.getSourceBandCount_());
-    const renderer = this.getRenderer();
-    renderer.reset({
-      vertexShader: parsedStyle.vertexShader,
-      fragmentShader: parsedStyle.fragmentShader,
-      uniforms: parsedStyle.uniforms,
-      paletteTextures: parsedStyle.paletteTextures,
-    });
-    this.changed();
+    if (this.hasRenderer()) {
+      const parsedStyle = parseStyle(this.style_, this.getSourceBandCount_());
+      const renderer = this.getRenderer();
+      renderer.reset({
+        vertexShader: parsedStyle.vertexShader,
+        fragmentShader: parsedStyle.fragmentShader,
+        uniforms: parsedStyle.uniforms,
+        paletteTextures: parsedStyle.paletteTextures,
+      });
+      this.changed();
+    }
   }
 
   /**

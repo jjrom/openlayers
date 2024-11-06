@@ -52,8 +52,7 @@ describe('ol/renderer/canvas/ImageLayer', function () {
     });
 
     afterEach(function () {
-      map.setTarget(null);
-      document.body.removeChild(target);
+      disposeMap(map);
     });
 
     it('properly detects pixels', function () {
@@ -124,8 +123,7 @@ describe('ol/renderer/canvas/ImageLayer', function () {
     });
 
     afterEach(function () {
-      map.setTarget(null);
-      document.body.removeChild(target);
+      disposeMap(map);
     });
 
     it('should not detect pixels when crossOrigin is not set', function () {
@@ -188,9 +186,7 @@ describe('ol/renderer/canvas/ImageLayer', function () {
     });
 
     afterEach(function () {
-      map.setTarget(null);
-      document.body.removeChild(div);
-      map.dispose();
+      disposeMap(map);
     });
 
     it('dispatches prerender and postrender events on the image layer', function (done) {
@@ -247,9 +243,7 @@ describe('ol/renderer/canvas/ImageLayer', function () {
     });
 
     afterEach(function () {
-      map.setTarget(null);
-      document.body.removeChild(div);
-      map.dispose();
+      disposeMap(map);
     });
 
     it('dispatches prerender and postrender events on the vector layer', function (done) {
@@ -360,11 +354,11 @@ describe('ol/renderer/canvas/ImageLayer', function () {
           renderer.renderFrame(frameState, null);
         }
         try {
-          const image = renderer.image_;
+          const image = renderer.image;
           expect(image).to.be.a(ImageWrapper);
           image.state = ImageState.EMPTY;
           expect(renderer.prepareFrame(frameState)).to.be(false);
-          expect(renderer.image_).to.be(null);
+          expect(renderer.image).to.be(null);
           done();
         } catch (e) {
           done(e);

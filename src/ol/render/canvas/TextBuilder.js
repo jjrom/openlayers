@@ -81,6 +81,12 @@ class CanvasTextBuilder extends CanvasBuilder {
 
     /**
      * @private
+     * @type {boolean|undefined}
+     */
+    this.textKeepUpright_ = undefined;
+
+    /**
+     * @private
      * @type {number}
      */
     this.textRotation_ = 0;
@@ -138,6 +144,7 @@ class CanvasTextBuilder extends CanvasBuilder {
     this.strokeKey_ = '';
 
     /**
+     * @private
      * @type {import('../../style/Style.js').DeclutterMode}
      */
     this.declutterMode_ = undefined;
@@ -152,6 +159,7 @@ class CanvasTextBuilder extends CanvasBuilder {
 
   /**
    * @return {import("../canvas.js").SerializableInstructions} the serializable instructions.
+   * @override
    */
   finish() {
     const instructions = super.finish();
@@ -165,6 +173,7 @@ class CanvasTextBuilder extends CanvasBuilder {
    * @param {import("../../geom/SimpleGeometry.js").default|import("../Feature.js").default} geometry Geometry.
    * @param {import("../../Feature.js").FeatureLike} feature Feature.
    * @param {number} [index] Render order index.
+   * @override
    */
   drawText(geometry, feature, index) {
     const fillState = this.textFillState_;
@@ -535,6 +544,7 @@ class CanvasTextBuilder extends CanvasBuilder {
       textKey,
       1,
       this.declutterMode_,
+      this.textKeepUpright_,
     ]);
     this.hitDetectionInstructions.push([
       CanvasInstruction.DRAW_CHARS,
@@ -552,12 +562,14 @@ class CanvasTextBuilder extends CanvasBuilder {
       textKey,
       1 / pixelRatio,
       this.declutterMode_,
+      this.textKeepUpright_,
     ]);
   }
 
   /**
    * @param {import("../../style/Text.js").default} textStyle Text style.
    * @param {Object} [sharedData] Shared data.
+   * @override
    */
   setTextStyle(textStyle, sharedData) {
     let textState, fillState, strokeState;
@@ -628,12 +640,15 @@ class CanvasTextBuilder extends CanvasBuilder {
       const textOffsetX = textStyle.getOffsetX();
       const textOffsetY = textStyle.getOffsetY();
       const textRotateWithView = textStyle.getRotateWithView();
+      const textKeepUpright = textStyle.getKeepUpright();
       const textRotation = textStyle.getRotation();
       this.text_ = textStyle.getText() || '';
       this.textOffsetX_ = textOffsetX === undefined ? 0 : textOffsetX;
       this.textOffsetY_ = textOffsetY === undefined ? 0 : textOffsetY;
       this.textRotateWithView_ =
         textRotateWithView === undefined ? false : textRotateWithView;
+      this.textKeepUpright_ =
+        textKeepUpright === undefined ? true : textKeepUpright;
       this.textRotation_ = textRotation === undefined ? 0 : textRotation;
 
       this.strokeKey_ = strokeState

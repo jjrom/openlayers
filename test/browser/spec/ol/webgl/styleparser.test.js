@@ -1,4 +1,5 @@
 import Feature from '../../../../../src/ol/Feature.js';
+import Point from '../../../../../src/ol/geom/Point.js';
 import {asArray} from '../../../../../src/ol/color.js';
 import {
   computeHash,
@@ -10,7 +11,7 @@ import {
   uniformNameForVariable,
 } from '../../../../../src/ol/expr/gpu.js';
 
-describe('ol.webgl.styleparser', () => {
+describe('ol/webgl/styleparser', () => {
   describe('parseLiteralStyle', () => {
     it('parses a style with variables', () => {
       const result = parseLiteralStyle({
@@ -46,7 +47,7 @@ describe('ol.webgl.styleparser', () => {
         },
       ]);
       expect(result.builder.symbolColorExpression_).to.eql(
-        'vec4(0.2, 0.4, 0.6, 1.0) * (1.0 - smoothstep(-0.63, 0.58, circleDistanceField(coordsPx, mix(4.0, 8.0, clamp((v_prop_population - u_var_lower) / (u_var_higher - u_var_lower), 0.0, 1.0))))) * 0.5',
+        'vec4(0.2, 0.4, 0.6, 1.0) * vec4(1.0, 1.0, 1.0, (1.0 - smoothstep(-0.63, 0.58, circleDistanceField(coordsPx, mix(4.0, 8.0, clamp((v_prop_population - u_var_lower) / (u_var_higher - u_var_lower), 0.0, 1.0)))))) * vec4(1.0, 1.0, 1.0, 0.5)',
       );
       expect(result.builder.symbolSizeExpression_).to.eql(
         `vec2(mix(4.0, 8.0, clamp((a_prop_population - u_var_lower) / (u_var_higher - u_var_lower), 0.0, 1.0)) * 2. + 0.5)`,
@@ -73,7 +74,7 @@ describe('ol.webgl.styleparser', () => {
         },
       ]);
       expect(result.builder.symbolColorExpression_).to.eql(
-        'vec4(0.2, 0.4, 0.6, 1.0) * (1.0 - smoothstep(-0.63, 0.58, circleDistanceField(coordsPx, 6.0)))',
+        'vec4(0.2, 0.4, 0.6, 1.0) * vec4(1.0, 1.0, 1.0, (1.0 - smoothstep(-0.63, 0.58, circleDistanceField(coordsPx, 6.0))))',
       );
       expect(result.builder.symbolSizeExpression_).to.eql(
         'vec2(6.0 * 2. + 0.5)',
@@ -142,7 +143,7 @@ describe('ol.webgl.styleparser', () => {
             },
           ]);
           expect(result.builder.symbolColorExpression_).to.eql(
-            'mix(v_prop_color2, v_prop_color1, smoothstep(-(3.0 + 4.0) + 0.63, -(3.0 + 4.0) - 0.58, circleDistanceField(coordsPx / vec2(1.5, 1.7), (v_prop_attr1 + (3.0 + 4.0) * 0.5)))) * (1.0 - smoothstep(-0.63, 0.58, circleDistanceField(coordsPx / vec2(1.5, 1.7), (v_prop_attr1 + (3.0 + 4.0) * 0.5)))) * (0.5 * 0.75)',
+            'mix(v_prop_color2, v_prop_color1, smoothstep(-(3.0 + 4.0) + 0.63, -(3.0 + 4.0) - 0.58, circleDistanceField(coordsPx / vec2(1.5, 1.7), (v_prop_attr1 + (3.0 + 4.0) * 0.5)))) * vec4(1.0, 1.0, 1.0, (1.0 - smoothstep(-0.63, 0.58, circleDistanceField(coordsPx / vec2(1.5, 1.7), (v_prop_attr1 + (3.0 + 4.0) * 0.5))))) * vec4(1.0, 1.0, 1.0, (0.5 * 0.75))',
           );
           expect(result.builder.symbolSizeExpression_).to.eql(
             'vec2((a_prop_attr1 + (3.0 + 4.0) * 0.5) * 2. + 0.5) * vec2(1.5, 1.7)',
@@ -168,7 +169,7 @@ describe('ol.webgl.styleparser', () => {
         });
         it('uses a simplified color expression', () => {
           expect(result.builder.symbolColorExpression_).to.eql(
-            'vec4(0.5, 0.5, 0.5, 0.5) * (1.0 - smoothstep(-0.63, 0.58, circleDistanceField(coordsPx, 10.0)))',
+            'vec4(1.0, 1.0, 1.0, 0.5) * vec4(1.0, 1.0, 1.0, (1.0 - smoothstep(-0.63, 0.58, circleDistanceField(coordsPx, 10.0))))',
           );
         });
       });
@@ -182,7 +183,7 @@ describe('ol.webgl.styleparser', () => {
         });
         it('uses a transparent fill color', () => {
           expect(result.builder.symbolColorExpression_).to.eql(
-            'mix(vec4(1.0, 0.0, 0.0, 1.0), vec4(0.), smoothstep(-4.0 + 0.63, -4.0 - 0.58, circleDistanceField(coordsPx, (10.0 + 4.0 * 0.5)))) * (1.0 - smoothstep(-0.63, 0.58, circleDistanceField(coordsPx, (10.0 + 4.0 * 0.5))))',
+            'mix(vec4(1.0, 0.0, 0.0, 1.0), vec4(0.), smoothstep(-4.0 + 0.63, -4.0 - 0.58, circleDistanceField(coordsPx, (10.0 + 4.0 * 0.5)))) * vec4(1.0, 1.0, 1.0, (1.0 - smoothstep(-0.63, 0.58, circleDistanceField(coordsPx, (10.0 + 4.0 * 0.5)))))',
           );
         });
       });
@@ -246,7 +247,7 @@ describe('ol.webgl.styleparser', () => {
             },
           ]);
           expect(result.builder.symbolColorExpression_).to.eql(
-            'mix(v_prop_color2, v_prop_color1, smoothstep(-(3.0 + 4.0) + 0.63, -(3.0 + 4.0) - 0.58, starDistanceField(coordsPx / vec2(1.5, 1.7), (10.0 - 3.0), v_prop_attr1 + (3.0 + 4.0) * 0.5, (2.0 * 5.0) + (3.0 + 4.0) * 0.5, (0.5 * 3.141592653589793)))) * (1.0 - smoothstep(-0.63, 0.58, starDistanceField(coordsPx / vec2(1.5, 1.7), (10.0 - 3.0), v_prop_attr1 + (3.0 + 4.0) * 0.5, (2.0 * 5.0) + (3.0 + 4.0) * 0.5, (0.5 * 3.141592653589793)))) * (0.5 * 0.75)',
+            'mix(v_prop_color2, v_prop_color1, smoothstep(-(3.0 + 4.0) + 0.63, -(3.0 + 4.0) - 0.58, starDistanceField(coordsPx / vec2(1.5, 1.7), (10.0 - 3.0), v_prop_attr1 + (3.0 + 4.0) * 0.5, (2.0 * 5.0) + (3.0 + 4.0) * 0.5, (0.5 * 3.141592653589793)))) * vec4(1.0, 1.0, 1.0, (1.0 - smoothstep(-0.63, 0.58, starDistanceField(coordsPx / vec2(1.5, 1.7), (10.0 - 3.0), v_prop_attr1 + (3.0 + 4.0) * 0.5, (2.0 * 5.0) + (3.0 + 4.0) * 0.5, (0.5 * 3.141592653589793))))) * vec4(1.0, 1.0, 1.0, (0.5 * 0.75))',
           );
           expect(result.builder.symbolSizeExpression_).to.eql(
             'vec2((max(a_prop_attr1, (2.0 * 5.0)) + (3.0 + 4.0) * 0.5) * 2. + 0.5) * vec2(1.5, 1.7)',
@@ -273,7 +274,7 @@ describe('ol.webgl.styleparser', () => {
         });
         it('uses a simplified color expression', () => {
           expect(result.builder.symbolColorExpression_).to.eql(
-            'vec4(0.5, 0.5, 0.5, 0.5) * (1.0 - smoothstep(-0.63, 0.58, regularDistanceField(coordsPx, 5.0, 10.0, 0.)))',
+            'vec4(1.0, 1.0, 1.0, 0.5) * vec4(1.0, 1.0, 1.0, (1.0 - smoothstep(-0.63, 0.58, regularDistanceField(coordsPx, 5.0, 10.0, 0.))))',
           );
         });
       });
@@ -288,7 +289,7 @@ describe('ol.webgl.styleparser', () => {
         });
         it('uses a transparent fill color', () => {
           expect(result.builder.symbolColorExpression_).to.eql(
-            'mix(vec4(1.0, 0.0, 0.0, 1.0), vec4(0.), smoothstep(-4.0 + 0.63, -4.0 - 0.58, regularDistanceField(coordsPx, 5.0, 10.0 + 4.0 * 0.5, 0.))) * (1.0 - smoothstep(-0.63, 0.58, regularDistanceField(coordsPx, 5.0, 10.0 + 4.0 * 0.5, 0.)))',
+            'mix(vec4(1.0, 0.0, 0.0, 1.0), vec4(0.), smoothstep(-4.0 + 0.63, -4.0 - 0.58, regularDistanceField(coordsPx, 5.0, 10.0 + 4.0 * 0.5, 0.))) * vec4(1.0, 1.0, 1.0, (1.0 - smoothstep(-0.63, 0.58, regularDistanceField(coordsPx, 5.0, 10.0 + 4.0 * 0.5, 0.))))',
           );
         });
       });
@@ -328,6 +329,7 @@ describe('ol.webgl.styleparser', () => {
         });
         it('sets up builder accordingly', () => {
           expect(result.builder.uniforms_).to.eql([
+            `vec2 u_texture${uid}_size`,
             `sampler2D u_texture${uid}`,
           ]);
           expect(result.builder.attributes_).to.eql([
@@ -343,7 +345,7 @@ describe('ol.webgl.styleparser', () => {
             },
           ]);
           expect(result.builder.symbolColorExpression_).to.eql(
-            `v_prop_color1 * (0.5 * 0.75) * samplePremultiplied(u_texture${uid}, v_texCoord)`,
+            `v_prop_color1 * vec4(1.0, 1.0, 1.0, (0.5 * 0.75)) * texture2D(u_texture${uid}, v_texCoord)`,
           );
           expect(result.builder.symbolSizeExpression_).to.eql(
             'vec2(30.0, 40.0) * vec2(1.5, 1.7)',
@@ -352,14 +354,15 @@ describe('ol.webgl.styleparser', () => {
             'vec2(-2.0, 1.0)',
           );
           expect(result.builder.texCoordExpression_).to.eql(
-            '(vec4((vec2(a_prop_attr1, 20.0)).xyxy) + vec4(0., 0., vec2(30.0, 40.0))) / (vec2(1.0, 1.0)).xyxy',
+            `(vec4((vec2(a_prop_attr1, 20.0)).xyxy) + vec4(0., 0., vec2(30.0, 40.0))) / (u_texture${uid}_size).xyxy`,
           );
           expect(result.builder.symbolRotateWithView_).to.eql(true);
           expect(Object.keys(result.attributes).length).to.eql(3);
           expect(result.attributes).to.have.property('attr1');
           expect(result.attributes).to.have.property('heading');
           expect(result.attributes).to.have.property('color1');
-          expect(Object.keys(result.uniforms).length).to.eql(1);
+          expect(Object.keys(result.uniforms).length).to.eql(2);
+          expect(result.uniforms).to.have.property(`u_texture${uid}_size`);
           expect(result.uniforms).to.have.property(`u_texture${uid}`);
         });
         it('uses the provided Image', () => {
@@ -764,7 +767,7 @@ describe('ol.webgl.styleparser', () => {
             'vec4 sampleStrokePattern',
           );
           expect(result.builder.strokeColorExpression_).to.eql(
-            `vec4(1.0, 0.0, 0.0, 1.0) * sampleStrokePattern(u_texture${uid}, vec2(1.0, 1.0), vec2(0., vec2(1.0, 1.0).y) + vec2(5.0, 5.0) * vec2(0., -1.) + vec2(5.0, 10.0) * vec2(1., -1.), vec2(5.0, 5.0), (2.0 * 10.0), currentLengthPx, currentRadiusRatio, v_width)`,
+            `vec4(1.0, 0.0, 0.0, 1.0) * sampleStrokePattern(u_texture${uid}, u_texture${uid}_size, vec2(0., u_texture${uid}_size.y) + vec2(5.0, 5.0) * vec2(0., -1.) + vec2(5.0, 10.0) * vec2(1., -1.), vec2(5.0, 5.0), (2.0 * 10.0), currentLengthPx, currentRadiusRatio, v_width)`,
           );
         });
       });
@@ -871,8 +874,33 @@ describe('ol.webgl.styleparser', () => {
             'vec4 sampleFillPattern',
           );
           expect(result.builder.fillColorExpression_).to.eql(
-            `vec4(1.0, 0.0, 0.0, 1.0) * sampleFillPattern(u_texture${uid}, vec2(1.0, 1.0), vec2(0., vec2(1.0, 1.0).y) + vec2(5.0, 5.0) * vec2(0., -1.) + vec2(5.0, 10.0) * vec2(1., -1.), vec2(5.0, 5.0), pxOrigin, pxPos)`,
+            `vec4(1.0, 0.0, 0.0, 1.0) * sampleFillPattern(u_texture${uid}, u_texture${uid}_size, vec2(0., u_texture${uid}_size.y) + vec2(5.0, 5.0) * vec2(0., -1.) + vec2(5.0, 10.0) * vec2(1., -1.), vec2(5.0, 5.0), pxOrigin, pxPos)`,
           );
+        });
+      });
+    });
+
+    describe('filter', () => {
+      let result;
+      beforeEach(() => {
+        result = parseLiteralStyle({
+          filter: [
+            'all',
+            ['==', ['geometry-type'], 'LineString'],
+            ['in', ['get', 'type'], ['literal', ['road', 'path', 'street']]],
+          ],
+        });
+      });
+      it('adds the filter expression and attributes to the shader builder', () => {
+        expect(result.builder.fragmentShaderFunctions_[0]).to.contain(
+          'bool operator_in_0',
+        );
+        expect(result.builder.getFragmentDiscardExpression()).to.be(
+          `!((v_prop_geometryType == ${stringToGlsl('LineString')}) && operator_in_0(v_prop_type))`,
+        );
+        expect(result.attributes).to.eql({
+          geometryType: {size: 1, callback: {}},
+          type: {size: 1, callback: {}},
         });
       });
     });
@@ -898,15 +926,23 @@ describe('ol.webgl.styleparser', () => {
           ],
           'circle-radius': 8,
           'circle-fill-color': ['get', 'color'],
-          'circle-scale': ['get', 'iconSize', 'number[]'],
+          'circle-scale': ['get', 'iconSize'],
+          'stroke-color': [
+            'match',
+            ['geometry-type'],
+            'Polygon',
+            'red',
+            'blue',
+          ],
         });
       });
       it('adds attributes to the shader builder', () => {
         expect(parseResult.builder.attributes_).to.eql([
-          'vec4 a_prop_iconSize',
+          'vec2 a_prop_iconSize',
           'float a_prop_lineType',
           'float a_prop_lineWidth',
           'vec2 a_prop_color',
+          'float a_prop_geometryType',
           'float a_prop_transparent',
           'vec2 a_prop_fillColor',
         ]);
@@ -915,13 +951,18 @@ describe('ol.webgl.styleparser', () => {
         expect(parseResult.builder.varyings_).to.eql([
           {
             name: 'v_prop_iconSize',
-            type: 'vec4',
+            type: 'vec2',
             expression: 'a_prop_iconSize',
           },
           {
             name: 'v_prop_color',
             type: 'vec4',
             expression: 'unpackColor(a_prop_color)',
+          },
+          {
+            name: 'v_prop_geometryType',
+            type: 'float',
+            expression: 'a_prop_geometryType',
           },
           {
             name: 'v_prop_transparent',
@@ -943,12 +984,13 @@ describe('ol.webgl.styleparser', () => {
       });
       it('returns attributes with their callbacks in the result', () => {
         expect(parseResult.attributes).to.eql({
-          iconSize: {size: 4, callback: {}},
+          iconSize: {size: 2, callback: {}},
           color: {size: 2, callback: {}},
           lineType: {size: 1, callback: {}},
           lineWidth: {size: 1, callback: {}},
           transparent: {size: 1, callback: {}},
           fillColor: {size: 2, callback: {}},
+          geometryType: {size: 1, callback: {}},
         });
       });
       it('processes the feature attributes according to their types', () => {
@@ -959,6 +1001,7 @@ describe('ol.webgl.styleparser', () => {
           lineWidth: 0.5,
           fillColor: 'rgba(123, 240, 100, 0.3)',
           transparent: true,
+          geometry: new Point([0, 0]),
         });
         expect(parseResult.attributes['iconSize'].callback(feature)).to.eql([
           12, 18,
@@ -977,6 +1020,9 @@ describe('ol.webgl.styleparser', () => {
         );
         expect(parseResult.attributes['transparent'].callback(feature)).to.eql(
           1,
+        );
+        expect(parseResult.attributes['geometryType'].callback(feature)).to.eql(
+          stringToGlsl('Point'),
         );
       });
     });
@@ -1015,7 +1061,7 @@ describe('ol.webgl.styleparser', () => {
       });
       it('adds uniforms to the shader builder', () => {
         expect(parseResult.builder.uniforms_).to.eql([
-          'vec4 u_var_iconSize',
+          'vec2 u_var_iconSize',
           'vec2 u_var_color',
           'float u_var_lineType',
           'float u_var_lineWidth',
@@ -1070,6 +1116,28 @@ describe('ol.webgl.styleparser', () => {
       expect(computeHash(path1)).not.to.eql(computeHash(path2));
       expect(computeHash(array1)).not.to.eql(computeHash(array2));
       expect(computeHash(path1)).not.to.eql(computeHash(array1));
+    });
+  });
+
+  describe('handle ambiguous match input', () => {
+    it('parses a match', () => {
+      const result = parseLiteralStyle({
+        'icon-src':
+          'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+        'icon-color': [
+          'match',
+          ['get', 'foo'],
+          'green',
+          [251, 173, 21, 0.5],
+          'red',
+          [251, 173, 21, 0.5],
+          [251, 173, 21, 0.5],
+        ],
+      });
+
+      expect(result.attributes.foo.callback({get: () => 'green'})).to.be.a(
+        'number',
+      );
     });
   });
 
